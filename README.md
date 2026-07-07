@@ -6,6 +6,7 @@ It uses the public FTCScout REST API to show:
 
 - team information
 - 7305-only game-year match list
+- game year selector for 2023, 2024, 2025, 2026, and 2027
 - 2026 maps to FTCScout season 2025, covering Royal Oak, Ann Arbor, Michigan State Championship-NW, and Troy MAYhem
 - competition filters using FTCScout event names
 - alliance station and teammates
