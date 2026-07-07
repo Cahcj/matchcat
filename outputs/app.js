@@ -27,6 +27,7 @@ const els = {
   latestMatch: document.querySelector("#latest-match"),
   latestEvent: document.querySelector("#latest-event"),
   eventStrip: document.querySelector("#event-strip"),
+  upcomingCard: document.querySelector("#upcoming-card"),
   matchBody: document.querySelector("#match-body"),
 };
 
@@ -170,10 +171,13 @@ function render() {
     state.eventFilter === "all"
       ? rows
       : rows.filter((row) => row.eventCode === state.eventFilter);
+  const upcomingMatch = getUpcomingMatch(visibleRows);
+  const pastRows = visibleRows.filter((row) => !isUpcoming(row));
 
   renderSummary(rows, visibleRows);
   renderEvents(rows);
-  renderMatches(visibleRows);
+  renderUpcomingMatch(upcomingMatch);
+  renderMatches(pastRows);
 }
 
 function getRows() {
@@ -300,6 +304,47 @@ function renderMatches(rows) {
   }).join("");
 }
 
+function renderUpcomingMatch(nextMatch) {
+  if (!nextMatch) {
+    els.upcomingCard.innerHTML = `
+      <div class="empty">No upcoming match is listed for this filter yet.</div>
+    `;
+    return;
+  }
+
+  const allianceClass = nextMatch.alliance === "Red" ? "pill--red" : "pill--blue";
+
+  els.upcomingCard.innerHTML = `
+    <article class="upcoming-match">
+      <div class="upcoming-match__main">
+        <span class="pill ${allianceClass}">${nextMatch.alliance} ${nextMatch.station}</span>
+        <h3>${formatMatchName(nextMatch)}</h3>
+        <p>${nextMatch.eventCode} / ${nextMatch.tournamentLevel}</p>
+      </div>
+      <div class="upcoming-match__meta">
+        <div>
+          <span>Time</span>
+          <strong>${formatDate(nextMatch.scheduledStartTime)}</strong>
+        </div>
+        <div>
+          <span>Partners</span>
+          <strong>${nextMatch.partners.length ? nextMatch.partners.join(", ") : "TBD"}</strong>
+        </div>
+      </div>
+      <div class="upcoming-match__opponents">
+        <span>Opponents</span>
+        ${formatOpponents(nextMatch.opponents)}
+      </div>
+    </article>
+  `;
+}
+
+function getUpcomingMatch(rows) {
+  return rows
+    .filter((row) => isUpcoming(row))
+    .sort((a, b) => getTime(a.scheduledStartTime) - getTime(b.scheduledStartTime))[0];
+}
+
 function buildOpponentStats() {
   const stats = new Map();
 
@@ -399,6 +444,19 @@ function getResult(myScore, oppScore) {
   return "Tie";
 }
 
+function isUpcoming(row) {
+  const matchTime = getTime(row.scheduledStartTime);
+  const now = Date.now();
+
+  if (row.hasBeenPlayed === false) return true;
+  return Number.isFinite(matchTime) && matchTime > now;
+}
+
+function getTime(value) {
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? Number.POSITIVE_INFINITY : time;
+}
+
 function resultClass(result) {
   return {
     Win: "result result--win",
@@ -451,6 +509,7 @@ function setLoading() {
   els.latestMatch.textContent = "--";
   els.latestEvent.textContent = "Waiting for data";
   els.eventStrip.innerHTML = "";
+  els.upcomingCard.innerHTML = `<div class="empty">Loading next match...</div>`;
   els.matchBody.innerHTML = `<tr><td colspan="8" class="empty">Loading matches from FTCScout...</td></tr>`;
   setStatus("Loading FTCScout data...");
 }

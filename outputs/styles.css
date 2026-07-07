@@ -148,7 +148,8 @@ h2 {
 .toolbar,
 .panel,
 .summary-card,
-.event-card {
+.event-card,
+.upcoming-panel {
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.94);
   box-shadow: var(--shadow);
@@ -240,6 +241,65 @@ select {
   color: var(--muted);
   font-size: 0.84rem;
   font-weight: 750;
+}
+
+.upcoming-panel {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.45fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+  margin-bottom: 14px;
+  border-radius: 8px;
+  padding: 22px;
+}
+
+.upcoming-card {
+  min-width: 0;
+}
+
+.upcoming-match {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.75fr) minmax(220px, 0.8fr) minmax(260px, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.upcoming-match h3 {
+  margin: 12px 0 4px;
+  font-size: clamp(1.7rem, 3vw, 2.5rem);
+  line-height: 1;
+}
+
+.upcoming-match p {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.upcoming-match__meta {
+  display: grid;
+  gap: 12px;
+}
+
+.upcoming-match__meta div,
+.upcoming-match__opponents {
+  border-left: 3px solid var(--line);
+  padding-left: 14px;
+}
+
+.upcoming-match__meta span,
+.upcoming-match__opponents > span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.upcoming-match__meta strong {
+  display: block;
+  font-size: 1.05rem;
 }
 
 .panel {
@@ -387,6 +447,8 @@ td {
 
 @media (max-width: 860px) {
   .toolbar,
+  .upcoming-panel,
+  .upcoming-match,
   .controls,
   .summary-grid {
     grid-template-columns: 1fr;
@@ -425,6 +487,7 @@ td {
   }
 
   .toolbar,
+  .upcoming-panel,
   .panel__header,
   .summary-card,
   .event-card {
