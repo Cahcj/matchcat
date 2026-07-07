@@ -7,10 +7,10 @@
   --panel: #ffffff;
   --red: #d64045;
   --blue: #2867d9;
-  --amber: #e3a21a;
+  --amber: #b88413;
   --mint: #2e9d74;
   --dark: #1e2933;
-  --shadow: 0 18px 50px rgba(23, 32, 42, 0.12);
+  --shadow: 0 1px 2px rgba(23, 32, 42, 0.06);
 }
 
 * {
@@ -36,7 +36,7 @@ a {
 
 .hero {
   position: relative;
-  min-height: clamp(520px, 78vh, 760px);
+  min-height: clamp(380px, 58vh, 540px);
   display: grid;
   align-items: center;
   overflow: hidden;
@@ -53,12 +53,13 @@ a {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  opacity: 0.32;
 }
 
 .hero__overlay {
   background:
-    linear-gradient(90deg, rgba(10, 14, 20, 0.92) 0%, rgba(10, 14, 20, 0.7) 42%, rgba(10, 14, 20, 0.22) 100%),
-    linear-gradient(0deg, rgba(10, 14, 20, 0.78) 0%, rgba(10, 14, 20, 0) 32%);
+    linear-gradient(90deg, rgba(10, 14, 20, 0.86) 0%, rgba(10, 14, 20, 0.68) 52%, rgba(10, 14, 20, 0.48) 100%),
+    linear-gradient(0deg, rgba(10, 14, 20, 0.72) 0%, rgba(10, 14, 20, 0) 32%);
 }
 
 .hero__content {
@@ -87,7 +88,7 @@ h2 {
 
 h1 {
   max-width: 760px;
-  font-size: clamp(4rem, 13vw, 9rem);
+  font-size: clamp(3.2rem, 10vw, 6.5rem);
   line-height: 0.9;
 }
 
@@ -151,7 +152,7 @@ h2 {
 .event-card,
 .upcoming-panel {
   border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.94);
+  background: var(--panel);
   box-shadow: var(--shadow);
 }
 
@@ -411,24 +412,24 @@ td {
   color: var(--blue);
 }
 
-.opponent-list {
+.team-rating-list {
   display: grid;
   gap: 8px;
   min-width: 170px;
 }
 
-.opponent {
+.team-rating {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 2px 8px;
   align-items: center;
 }
 
-.opponent strong {
+.team-rating strong {
   font-size: 0.94rem;
 }
 
-.opponent span {
+.team-rating span {
   color: var(--muted);
   font-size: 0.76rem;
 }
@@ -437,6 +438,10 @@ td {
   grid-column: 1 / -1;
   color: var(--amber) !important;
   letter-spacing: 0;
+}
+
+.stars:empty {
+  display: none;
 }
 
 .empty {
@@ -471,7 +476,7 @@ td {
 
 @media (max-width: 560px) {
   .hero {
-    min-height: 590px;
+    min-height: 500px;
   }
 
   .hero__content {

@@ -118,16 +118,16 @@ async function loadEventDetails() {
 }
 
 async function loadOpponentTeamNames() {
-  const opponentNumbers = new Set();
+  const teamNumbers = new Set();
 
   state.participation.forEach((entry) => {
     const detail = state.details.get(`${entry.season}:${entry.eventCode}:${entry.matchId}`);
     (detail?.teams ?? [])
-      .filter((team) => team.alliance !== entry.alliance)
-      .forEach((team) => opponentNumbers.add(team.teamNumber));
+      .filter((team) => team.teamNumber !== state.team)
+      .forEach((team) => teamNumbers.add(team.teamNumber));
   });
 
-  const requests = [...opponentNumbers].map(async (teamNumber) => {
+  const requests = [...teamNumbers].map(async (teamNumber) => {
     try {
       const team = await getJson(`${API_ROOT}/teams/${teamNumber}`);
       state.teamNames.set(teamNumber, team?.name ?? `Team ${teamNumber}`);
@@ -196,7 +196,13 @@ function getRows() {
       const opponentTeams = teams
         .filter((team) => team.alliance !== entry.alliance)
         .map((team) => team.teamNumber);
-      const partners = allianceTeams.filter((teamNumber) => teamNumber !== state.team);
+      const partners = allianceTeams
+        .filter((teamNumber) => teamNumber !== state.team)
+        .map((teamNumber) => ({
+          teamNumber,
+          name: state.teamNames.get(teamNumber) ?? `Team ${teamNumber}`,
+          stats: state.opponentStats.get(teamNumber),
+        }));
       const opponents = opponentTeams.map((teamNumber) => ({
         teamNumber,
         name: state.teamNames.get(teamNumber) ?? `Team ${teamNumber}`,
@@ -294,8 +300,8 @@ function renderMatches(rows) {
         </td>
         <td>${row.eventCode}</td>
         <td><span class="pill ${allianceClass}">${row.alliance} ${row.station}</span></td>
-        <td>${row.partners.length ? row.partners.join(", ") : "TBD"}</td>
-        <td>${formatOpponents(row.opponents)}</td>
+        <td>${formatTeamRatings(row.partners)}</td>
+        <td>${formatTeamRatings(row.opponents)}</td>
         <td>${formatScore(row)}</td>
         <td class="${resultClass(row.result)}">${row.result}</td>
         <td>${formatDate(row.scheduledStartTime)}</td>
@@ -327,13 +333,13 @@ function renderUpcomingMatch(nextMatch) {
           <strong>${formatDate(nextMatch.scheduledStartTime)}</strong>
         </div>
         <div>
-          <span>Partners</span>
-          <strong>${nextMatch.partners.length ? nextMatch.partners.join(", ") : "TBD"}</strong>
+          <span>Teammates</span>
+          ${formatTeamRatings(nextMatch.partners)}
         </div>
       </div>
       <div class="upcoming-match__opponents">
         <span>Opponents</span>
-        ${formatOpponents(nextMatch.opponents)}
+        ${formatTeamRatings(nextMatch.opponents)}
       </div>
     </article>
   `;
@@ -383,18 +389,18 @@ function buildOpponentStats() {
   return stats;
 }
 
-function formatOpponents(opponents) {
-  if (!opponents.length) return "TBD";
+function formatTeamRatings(teams) {
+  if (!teams.length) return "TBD";
 
   return `
-    <div class="opponent-list">
-      ${opponents.map(({ teamNumber, name, stats }) => {
+    <div class="team-rating-list">
+      ${teams.map(({ teamNumber, name, stats }) => {
         const record = stats ? `${stats.wins}-${stats.losses}-${stats.ties}` : "0-0-0";
         const stars = stats ? stats.stars : 0;
         const rate = stats ? `${Math.round(stats.winRate * 100)}%` : "--";
 
         return `
-          <div class="opponent">
+          <div class="team-rating">
             <strong>${escapeHtml(name)}</strong>
             <span>#${teamNumber}</span>
             <span>${record} / ${rate}</span>
@@ -408,7 +414,7 @@ function formatOpponents(opponents) {
 
 function starRating(stars) {
   const filled = Math.max(0, Math.min(5, stars));
-  return "&#9733;".repeat(filled) + "&#9734;".repeat(5 - filled);
+  return filled ? "&#9733;".repeat(filled) : "";
 }
 
 function escapeHtml(value) {
