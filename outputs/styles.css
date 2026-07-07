@@ -271,7 +271,7 @@ select {
 table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 920px;
+  min-width: 1080px;
 }
 
 th,
@@ -349,6 +349,34 @@ td {
 
 .score-blue {
   color: var(--blue);
+}
+
+.opponent-list {
+  display: grid;
+  gap: 8px;
+  min-width: 170px;
+}
+
+.opponent {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 8px;
+  align-items: center;
+}
+
+.opponent strong {
+  font-size: 0.94rem;
+}
+
+.opponent span {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.stars {
+  grid-column: 1 / -1;
+  color: var(--amber) !important;
+  letter-spacing: 0;
 }
 
 .empty {

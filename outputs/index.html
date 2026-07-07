@@ -19,8 +19,8 @@
           <p class="eyebrow">FTCScout live tracker</p>
           <h1 id="page-title">MatchCat</h1>
           <p class="hero__copy">
-            Team 7305 match schedule, alliance station, scores, event splits,
-            and field status in one sharp little dashboard.
+            Team 7305 match schedule, alliance station, scores, opponent records,
+            and strength ratings in one sharp little dashboard.
           </p>
           <div class="hero__actions">
             <a class="button button--primary" href="#matches">View matches</a>
@@ -48,8 +48,11 @@
               <input id="team-input" inputmode="numeric" pattern="[0-9]*" value="7305">
             </label>
             <label>
-              Season
-              <input id="season-input" inputmode="numeric" pattern="[0-9]*" value="2025">
+              Game Year
+              <select id="year-input">
+                <option value="2026" selected>2026</option>
+                <option value="2027">2027</option>
+              </select>
             </label>
             <label>
               Event
@@ -102,10 +105,10 @@
                   <th>Event</th>
                   <th>Alliance</th>
                   <th>Partners</th>
+                  <th>Opponents</th>
                   <th>Score</th>
                   <th>Result</th>
                   <th>Time</th>
-                  <th>Flags</th>
                 </tr>
               </thead>
               <tbody id="match-body"></tbody>

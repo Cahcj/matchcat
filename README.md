@@ -8,8 +8,8 @@ It uses the public FTCScout REST API to show:
 - season match list
 - event filters
 - alliance station and partners
+- opponent records and 0-5 star ratings
 - scores and record summaries
-- field/status flags
 
 ## Open Locally
 
@@ -21,4 +21,3 @@ Open `outputs/index.html` in a browser.
 - `outputs/styles.css`
 - `outputs/app.js`
 - `outputs/matchcat-hero.png`
-

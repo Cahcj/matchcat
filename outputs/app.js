@@ -2,17 +2,18 @@ const API_ROOT = "https://api.ftcscout.org/rest/v1";
 
 const state = {
   team: 7305,
-  season: 2025,
+  year: 2026,
   teamInfo: null,
   participation: [],
   details: new Map(),
+  opponentStats: new Map(),
   eventFilter: "all",
 };
 
 const els = {
   form: document.querySelector("#tracker-form"),
   teamInput: document.querySelector("#team-input"),
-  seasonInput: document.querySelector("#season-input"),
+  yearInput: document.querySelector("#year-input"),
   eventFilter: document.querySelector("#event-filter"),
   status: document.querySelector("#status"),
   teamTitle: document.querySelector("#team-title"),
@@ -31,15 +32,15 @@ const els = {
 els.form.addEventListener("submit", (event) => {
   event.preventDefault();
   const nextTeam = Number.parseInt(els.teamInput.value, 10);
-  const nextSeason = Number.parseInt(els.seasonInput.value, 10);
+  const nextYear = Number.parseInt(els.yearInput.value, 10);
 
-  if (!Number.isFinite(nextTeam) || !Number.isFinite(nextSeason)) {
-    setStatus("Enter a valid team number and season.");
+  if (!Number.isFinite(nextTeam) || !Number.isFinite(nextYear)) {
+    setStatus("Enter a valid team number and game year.");
     return;
   }
 
   state.team = nextTeam;
-  state.season = nextSeason;
+  state.year = nextYear;
   loadTracker();
 });
 
@@ -53,38 +54,57 @@ loadTracker();
 async function loadTracker() {
   setLoading();
   state.details = new Map();
+  state.opponentStats = new Map();
   state.eventFilter = "all";
   els.eventFilter.value = "all";
 
   try {
-    const [teamInfo, matchesResponse] = await Promise.all([
+    const [teamInfo, seasonMatches] = await Promise.all([
       getJson(`${API_ROOT}/teams/${state.team}`),
-      getJson(`${API_ROOT}/teams/${state.team}/matches?season=${state.season}`),
+      loadTeamMatchesForGameYear(state.year),
     ]);
 
     state.teamInfo = teamInfo;
-    state.participation = normalizeCollection(matchesResponse);
+    state.participation = seasonMatches;
     await loadEventDetails();
+    state.participation = state.participation.filter((match) => isMatchInGameYear(match));
+    state.opponentStats = buildOpponentStats();
     populateEventFilter();
     render();
-    setStatus(`Updated from FTCScout for ${state.season}.`);
+    setStatus(`Updated from FTCScout for ${state.year} games.`);
   } catch (error) {
     console.error(error);
     setStatus("FTCScout data could not load right now.");
-    els.matchBody.innerHTML = `<tr><td colspan="8" class="empty">No live data returned for this team and season.</td></tr>`;
+    els.matchBody.innerHTML = `<tr><td colspan="8" class="empty">No live data returned for this team and game year.</td></tr>`;
   }
 }
 
+async function loadTeamMatchesForGameYear(year) {
+  const candidateSeasons = [...new Set([year - 1, year])];
+  const responses = await Promise.allSettled(
+    candidateSeasons.map((season) =>
+      getJson(`${API_ROOT}/teams/${state.team}/matches?season=${season}`),
+    ),
+  );
+
+  return responses.flatMap((response) =>
+    response.status === "fulfilled" ? normalizeCollection(response.value) : [],
+  );
+}
+
 async function loadEventDetails() {
-  const eventCodes = [...new Set(state.participation.map((match) => match.eventCode))];
-  const requests = eventCodes.map(async (eventCode) => {
+  const eventKeys = [...new Set(
+    state.participation.map((match) => `${match.season}:${match.eventCode}`),
+  )];
+  const requests = eventKeys.map(async (eventKey) => {
+    const [season, eventCode] = eventKey.split(":");
     try {
       const response = await getJson(
-        `${API_ROOT}/events/${state.season}/${eventCode}/matches`,
+        `${API_ROOT}/events/${season}/${eventCode}/matches`,
       );
       const matches = normalizeCollection(response);
       matches.forEach((match) => {
-        state.details.set(`${eventCode}:${match.id}`, match);
+        state.details.set(`${match.eventSeason}:${eventCode}:${match.id}`, match);
       });
     } catch (error) {
       console.warn(`Could not load details for ${eventCode}`, error);
@@ -134,7 +154,7 @@ function render() {
 function getRows() {
   return state.participation
     .map((entry) => {
-      const detail = state.details.get(`${entry.eventCode}:${entry.matchId}`);
+      const detail = state.details.get(`${entry.season}:${entry.eventCode}:${entry.matchId}`);
       const teams = detail?.teams ?? [];
       const myAlliance = entry.alliance?.toLowerCase();
       const redScore = detail?.scores?.red?.totalPoints;
@@ -144,12 +164,20 @@ function getRows() {
       const allianceTeams = teams
         .filter((team) => team.alliance === entry.alliance)
         .map((team) => team.teamNumber);
+      const opponentTeams = teams
+        .filter((team) => team.alliance !== entry.alliance)
+        .map((team) => team.teamNumber);
       const partners = allianceTeams.filter((teamNumber) => teamNumber !== state.team);
+      const opponents = opponentTeams.map((teamNumber) => ({
+        teamNumber,
+        stats: state.opponentStats.get(teamNumber),
+      }));
 
       return {
         ...entry,
         detail,
         partners,
+        opponents,
         redScore,
         blueScore,
         myScore,
@@ -225,12 +253,6 @@ function renderMatches(rows) {
 
   els.matchBody.innerHTML = rows.map((row) => {
     const allianceClass = row.alliance === "Red" ? "pill--red" : "pill--blue";
-    const flags = [
-      row.surrogate ? "Surrogate" : "",
-      row.noShow ? "No-show" : "",
-      row.dq ? "DQ" : "",
-      row.onField === false ? "Off field" : "",
-    ].filter(Boolean).join(", ");
 
     return `
       <tr>
@@ -243,13 +265,77 @@ function renderMatches(rows) {
         <td>${row.eventCode}</td>
         <td><span class="pill ${allianceClass}">${row.alliance} ${row.station}</span></td>
         <td>${row.partners.length ? row.partners.join(", ") : "TBD"}</td>
+        <td>${formatOpponents(row.opponents)}</td>
         <td>${formatScore(row)}</td>
         <td class="${resultClass(row.result)}">${row.result}</td>
         <td>${formatDate(row.scheduledStartTime)}</td>
-        <td>${flags || `<span class="pill pill--neutral">Clear</span>`}</td>
       </tr>
     `;
   }).join("");
+}
+
+function buildOpponentStats() {
+  const stats = new Map();
+
+  state.details.forEach((match) => {
+    const redScore = match?.scores?.red?.totalPoints;
+    const blueScore = match?.scores?.blue?.totalPoints;
+
+    if (!Number.isFinite(redScore) || !Number.isFinite(blueScore)) return;
+
+    (match.teams ?? []).forEach((team) => {
+      const current = stats.get(team.teamNumber) ?? {
+        wins: 0,
+        losses: 0,
+        ties: 0,
+        played: 0,
+      };
+      const teamScore = team.alliance === "Red" ? redScore : blueScore;
+      const otherScore = team.alliance === "Red" ? blueScore : redScore;
+
+      current.played += 1;
+      if (teamScore > otherScore) current.wins += 1;
+      if (teamScore < otherScore) current.losses += 1;
+      if (teamScore === otherScore) current.ties += 1;
+      stats.set(team.teamNumber, current);
+    });
+  });
+
+  stats.forEach((record) => {
+    record.winRate = record.played
+      ? (record.wins + record.ties * 0.5) / record.played
+      : 0;
+    record.stars = Math.round(record.winRate * 5);
+  });
+
+  return stats;
+}
+
+function formatOpponents(opponents) {
+  if (!opponents.length) return "TBD";
+
+  return `
+    <div class="opponent-list">
+      ${opponents.map(({ teamNumber, stats }) => {
+        const record = stats ? `${stats.wins}-${stats.losses}-${stats.ties}` : "0-0-0";
+        const stars = stats ? stats.stars : 0;
+        const rate = stats ? `${Math.round(stats.winRate * 100)}%` : "--";
+
+        return `
+          <div class="opponent">
+            <strong>${teamNumber}</strong>
+            <span>${record} / ${rate}</span>
+            <span class="stars" aria-label="${stars} out of 5 stars">${starRating(stars)}</span>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
+function starRating(stars) {
+  const filled = Math.max(0, Math.min(5, stars));
+  return "★".repeat(filled) + "☆".repeat(5 - filled);
 }
 
 function formatMatchName(row) {
@@ -294,6 +380,18 @@ function formatDate(value) {
     hour: "numeric",
     minute: "2-digit",
   }).format(date);
+}
+
+function isMatchInGameYear(match) {
+  const detail = state.details.get(`${match.season}:${match.eventCode}:${match.matchId}`);
+  const dateValue = detail?.scheduledStartTime ?? match.createdAt ?? match.updatedAt;
+  const date = new Date(dateValue);
+
+  if (Number.isNaN(date.getTime())) {
+    return Number(match.season) === state.year - 1;
+  }
+
+  return date.getFullYear() === state.year;
 }
 
 function setLoading() {
