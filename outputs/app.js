@@ -8,7 +8,8 @@ const state = {
   participation: [],
   details: new Map(),
   events: new Map(),
-  opponentStats: new Map(),
+  teamEventStats: new Map(),
+  teamEventRanks: new Map(),
   teamNames: new Map(),
   eventFilter: "all",
 };
@@ -64,7 +65,8 @@ async function loadTracker() {
   setLoading();
   state.details = new Map();
   state.events = new Map();
-  state.opponentStats = new Map();
+  state.teamEventStats = new Map();
+  state.teamEventRanks = new Map();
   state.teamNames = new Map();
   state.eventFilter = "all";
   els.eventFilter.value = "all";
@@ -79,7 +81,8 @@ async function loadTracker() {
     state.participation = seasonMatches;
     await loadEventDetails();
     state.participation = state.participation.filter((match) => isMatchInGameYear(match));
-    state.opponentStats = buildOpponentStats();
+    state.teamEventStats = buildTeamEventStats();
+    state.teamEventRanks = buildTeamEventRanks();
     await loadOpponentTeamNames();
     populateEventFilter();
     render();
@@ -212,16 +215,8 @@ function getRows() {
         .map((team) => team.teamNumber);
       const partners = allianceTeams
         .filter((teamNumber) => teamNumber !== state.team)
-        .map((teamNumber) => ({
-          teamNumber,
-          name: state.teamNames.get(teamNumber) ?? `Team ${teamNumber}`,
-          stats: state.opponentStats.get(teamNumber),
-        }));
-      const opponents = opponentTeams.map((teamNumber) => ({
-        teamNumber,
-        name: state.teamNames.get(teamNumber) ?? `Team ${teamNumber}`,
-        stats: state.opponentStats.get(teamNumber),
-      }));
+        .map((teamNumber) => getTeamRating(teamNumber, entry));
+      const opponents = opponentTeams.map((teamNumber) => getTeamRating(teamNumber, entry));
 
       return {
         ...entry,
@@ -352,18 +347,41 @@ function eventName(match) {
   return state.events.get(eventKey(match))?.name ?? match.eventCode;
 }
 
-function buildOpponentStats() {
+function detailEventKey(match) {
+  return `${match.eventSeason}:${match.eventCode}`;
+}
+
+function teamStatsKey(key, teamNumber) {
+  return `${key}:${teamNumber}`;
+}
+
+function eventDisplayName(key) {
+  return state.events.get(key)?.name ?? key.split(":")[1] ?? key;
+}
+
+function eventSortTime(key) {
+  const event = state.events.get(key);
+  const value = event?.end ?? event?.start ?? event?.dateEnd ?? event?.dateStart ?? event?.createdAt;
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? Number.NEGATIVE_INFINITY : time;
+}
+
+function buildTeamEventStats() {
   const stats = new Map();
 
   state.details.forEach((match) => {
     const redScore = match?.scores?.red?.totalPoints;
     const blueScore = match?.scores?.blue?.totalPoints;
+    const key = detailEventKey(match);
 
     if (!isDetailInGameYear(match)) return;
     if (!Number.isFinite(redScore) || !Number.isFinite(blueScore)) return;
 
     (match.teams ?? []).forEach((team) => {
-      const current = stats.get(team.teamNumber) ?? {
+      const currentKey = teamStatsKey(key, team.teamNumber);
+      const current = stats.get(currentKey) ?? {
+        eventKey: key,
+        teamNumber: team.teamNumber,
         wins: 0,
         losses: 0,
         ties: 0,
@@ -376,7 +394,7 @@ function buildOpponentStats() {
       if (teamScore > otherScore) current.wins += 1;
       if (teamScore < otherScore) current.losses += 1;
       if (teamScore === otherScore) current.ties += 1;
-      stats.set(team.teamNumber, current);
+      stats.set(currentKey, current);
     });
   });
 
@@ -390,22 +408,100 @@ function buildOpponentStats() {
   return stats;
 }
 
+function buildTeamEventRanks() {
+  const ranks = new Map();
+  const groupedStats = new Map();
+
+  state.teamEventStats.forEach((record) => {
+    const records = groupedStats.get(record.eventKey) ?? [];
+    records.push(record);
+    groupedStats.set(record.eventKey, records);
+  });
+
+  groupedStats.forEach((records, key) => {
+    records
+      .sort((a, b) =>
+        b.winRate - a.winRate ||
+        b.wins - a.wins ||
+        a.losses - b.losses ||
+        Number(a.teamNumber) - Number(b.teamNumber),
+      )
+      .forEach((record, index) => {
+        ranks.set(teamStatsKey(key, record.teamNumber), index + 1);
+      });
+  });
+
+  return ranks;
+}
+
+function getTeamRating(teamNumber, matchEntry) {
+  const currentEventKey = eventKey(matchEntry);
+  const currentKey = teamStatsKey(currentEventKey, teamNumber);
+  const currentStats = state.teamEventStats.get(currentKey);
+  const resolved = currentStats?.played
+    ? {
+        stats: currentStats,
+        rank: state.teamEventRanks.get(currentKey),
+        sourceEventName: eventName(matchEntry),
+        isFallback: false,
+      }
+    : findPreviousTeamEventRating(teamNumber, currentEventKey);
+
+  return {
+    teamNumber,
+    name: state.teamNames.get(teamNumber) ?? `Team ${teamNumber}`,
+    ...resolved,
+  };
+}
+
+function findPreviousTeamEventRating(teamNumber, currentEventKey) {
+  const currentTime = eventSortTime(currentEventKey);
+  const candidates = [];
+
+  state.teamEventStats.forEach((stats) => {
+    if (stats.teamNumber !== teamNumber || stats.eventKey === currentEventKey || !stats.played) return;
+
+    const eventTime = eventSortTime(stats.eventKey);
+    if (Number.isFinite(currentTime) && Number.isFinite(eventTime) && eventTime >= currentTime) return;
+
+    candidates.push({
+      stats,
+      rank: state.teamEventRanks.get(teamStatsKey(stats.eventKey, teamNumber)),
+      sourceEventName: eventDisplayName(stats.eventKey),
+      eventTime,
+      isFallback: true,
+    });
+  });
+
+  return candidates.sort((a, b) => b.eventTime - a.eventTime)[0] ?? {
+    stats: null,
+    rank: null,
+    sourceEventName: "",
+    isFallback: false,
+  };
+}
+
 function formatTeamRatings(teams) {
   if (!teams.length) return "TBD";
 
   return `
     <div class="team-rating-list">
-      ${teams.map(({ teamNumber, name, stats }) => {
+      ${teams.map(({ teamNumber, name, stats, rank, sourceEventName, isFallback }) => {
         const record = stats ? `${stats.wins}-${stats.losses}-${stats.ties}` : "0-0-0";
         const stars = stats ? stats.stars : 0;
         const rate = stats ? `${Math.round(stats.winRate * 100)}%` : "--";
+        const rankLabel = Number.isFinite(rank) ? ` / rank ${rank}` : "";
+        const sourceLabel = isFallback && sourceEventName
+          ? `<span class="rating-source">Stars from ${escapeHtml(sourceEventName)}</span>`
+          : "";
 
         return `
           <div class="team-rating">
             <strong>${escapeHtml(name)}</strong>
-            <span>#${teamNumber}</span>
+            <span>#${teamNumber}${rankLabel}</span>
             <span>${record} / ${rate}</span>
             <span class="stars" aria-label="${stars} out of 5 stars">${starRating(stars)}</span>
+            ${sourceLabel}
           </div>
         `;
       }).join("")}
