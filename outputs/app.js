@@ -33,6 +33,14 @@ const els = {
 
 els.form.addEventListener("submit", (event) => {
   event.preventDefault();
+  refreshSelectedYear();
+});
+
+els.yearInput.addEventListener("change", () => {
+  refreshSelectedYear();
+});
+
+function refreshSelectedYear() {
   const nextYear = Number.parseInt(els.yearInput.value, 10);
 
   if (!Number.isFinite(nextYear)) {
@@ -43,7 +51,7 @@ els.form.addEventListener("submit", (event) => {
   state.team = TEAM_NUMBER;
   state.year = nextYear;
   loadTracker();
-});
+}
 
 els.eventFilter.addEventListener("change", () => {
   state.eventFilter = els.eventFilter.value;
