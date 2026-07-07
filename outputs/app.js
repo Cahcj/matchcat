@@ -7,6 +7,7 @@ const state = {
   teamInfo: null,
   participation: [],
   details: new Map(),
+  events: new Map(),
   opponentStats: new Map(),
   teamNames: new Map(),
   eventFilter: "all",
@@ -55,6 +56,7 @@ loadTracker();
 async function loadTracker() {
   setLoading();
   state.details = new Map();
+  state.events = new Map();
   state.opponentStats = new Map();
   state.teamNames = new Map();
   state.eventFilter = "all";
@@ -105,7 +107,9 @@ async function loadEventDetails() {
       const response = await getJson(
         `${API_ROOT}/events/${season}/${eventCode}/matches`,
       );
+      const eventInfo = await getJson(`${API_ROOT}/events/${season}/${eventCode}`);
       const matches = normalizeCollection(response);
+      state.events.set(`${season}:${eventCode}`, eventInfo);
       matches.forEach((match) => {
         state.details.set(`${match.eventSeason}:${eventCode}:${match.id}`, match);
       });
@@ -155,12 +159,18 @@ function normalizeCollection(response) {
 }
 
 function populateEventFilter() {
-  const codes = [...new Set(state.participation.map((match) => match.eventCode))].sort();
-  els.eventFilter.innerHTML = `<option value="all">All events</option>`;
-  codes.forEach((code) => {
+  const events = [...new Map(
+    state.participation.map((match) => {
+      const key = eventKey(match);
+      return [key, { key, name: eventName(match), code: match.eventCode }];
+    }),
+  ).values()].sort((a, b) => a.name.localeCompare(b.name));
+
+  els.eventFilter.innerHTML = `<option value="all">All competitions</option>`;
+  events.forEach((event) => {
     const option = document.createElement("option");
-    option.value = code;
-    option.textContent = code;
+    option.value = event.key;
+    option.textContent = event.name;
     els.eventFilter.append(option);
   });
 }
@@ -170,7 +180,7 @@ function render() {
   const visibleRows =
     state.eventFilter === "all"
       ? rows
-      : rows.filter((row) => row.eventCode === state.eventFilter);
+      : rows.filter((row) => row.eventKey === state.eventFilter);
   const upcomingMatch = getUpcomingMatch(visibleRows);
   const pastRows = visibleRows.filter((row) => !isUpcoming(row));
 
@@ -212,6 +222,8 @@ function getRows() {
       return {
         ...entry,
         detail,
+        eventKey: eventKey(entry),
+        eventName: eventName(entry),
         partners,
         opponents,
         redScore,
@@ -225,14 +237,14 @@ function getRows() {
       };
     })
     .sort((a, b) => {
-      const eventSort = String(a.eventCode).localeCompare(String(b.eventCode));
+      const eventSort = String(a.eventName).localeCompare(String(b.eventName));
       return eventSort || Number(a.matchId) - Number(b.matchId);
     });
 }
 
 function renderSummary(allRows, visibleRows) {
   const team = state.teamInfo;
-  const eventCodes = new Set(allRows.map((row) => row.eventCode));
+  const eventCodes = new Set(allRows.map((row) => row.eventKey));
   const played = allRows.filter((row) => row.result !== "Pending" && row.result !== "No score");
   const wins = played.filter((row) => row.result === "Win").length;
   const losses = played.filter((row) => row.result === "Loss").length;
@@ -255,18 +267,24 @@ function renderSummary(allRows, visibleRows) {
   els.recordCount.textContent = played.length ? `${wins}-${losses}-${ties}` : "--";
   els.avgScore.textContent = `Avg alliance score ${average}`;
   els.latestMatch.textContent = latest ? formatMatchName(latest) : "--";
-  els.latestEvent.textContent = latest ? `${latest.eventCode} / ${formatDate(latest.scheduledStartTime)}` : "Waiting for data";
+  els.latestEvent.textContent = latest ? `${latest.eventName} / ${formatDate(latest.scheduledStartTime)}` : "Waiting for data";
 }
 
 function renderEvents(rows) {
   const events = [...rows.reduce((map, row) => {
-    const current = map.get(row.eventCode) ?? { code: row.eventCode, matches: 0, wins: 0, scored: [] };
+    const current = map.get(row.eventKey) ?? {
+      key: row.eventKey,
+      name: row.eventName,
+      matches: 0,
+      wins: 0,
+      scored: [],
+    };
     current.matches += 1;
     if (row.result === "Win") current.wins += 1;
     if (Number.isFinite(row.myScore)) current.scored.push(row.myScore);
-    map.set(row.eventCode, current);
+    map.set(row.eventKey, current);
     return map;
-  }, new Map()).values()].sort((a, b) => a.code.localeCompare(b.code));
+  }, new Map()).values()].sort((a, b) => a.name.localeCompare(b.name));
 
   els.eventStrip.innerHTML = events.map((event) => {
     const avg = event.scored.length
@@ -274,7 +292,7 @@ function renderEvents(rows) {
       : "--";
     return `
       <article class="event-card">
-        <strong>${event.code}</strong>
+        <strong>${escapeHtml(event.name)}</strong>
         <span>${event.matches} matches / ${event.wins} wins / avg ${avg}</span>
       </article>
     `;
@@ -298,7 +316,7 @@ function renderMatches(rows) {
             <span>${row.tournamentLevel}</span>
           </div>
         </td>
-        <td>${row.eventCode}</td>
+        <td>${escapeHtml(row.eventName)}</td>
         <td><span class="pill ${allianceClass}">${row.alliance} ${row.station}</span></td>
         <td>${formatTeamRatings(row.partners)}</td>
         <td>${formatTeamRatings(row.opponents)}</td>
@@ -325,7 +343,7 @@ function renderUpcomingMatch(nextMatch) {
       <div class="upcoming-match__main">
         <span class="pill ${allianceClass}">${nextMatch.alliance} ${nextMatch.station}</span>
         <h3>${formatMatchName(nextMatch)}</h3>
-        <p>${nextMatch.eventCode} / ${nextMatch.tournamentLevel}</p>
+        <p>${escapeHtml(nextMatch.eventName)} / ${nextMatch.tournamentLevel}</p>
       </div>
       <div class="upcoming-match__meta">
         <div>
@@ -349,6 +367,14 @@ function getUpcomingMatch(rows) {
   return rows
     .filter((row) => isUpcoming(row))
     .sort((a, b) => getTime(a.scheduledStartTime) - getTime(b.scheduledStartTime))[0];
+}
+
+function eventKey(match) {
+  return `${match.season}:${match.eventCode}`;
+}
+
+function eventName(match) {
+  return state.events.get(eventKey(match))?.name ?? match.eventCode;
 }
 
 function buildOpponentStats() {
