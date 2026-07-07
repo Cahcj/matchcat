@@ -1,14 +1,14 @@
 # MatchCat
 
-MatchCat is a static FTC match tracker for team 7305, Clague GearCats.
+MatchCat is a static FTC member dashboard for team 7305, Clague GearCats.
 
 It uses the public FTCScout REST API to show:
 
 - team information
-- season match list
+- 7305-only game-year match list
 - event filters
 - alliance station and partners
-- opponent records and 0-5 star ratings
+- opponent team names, records, and 0-5 star ratings
 - scores and record summaries
 
 ## Open Locally

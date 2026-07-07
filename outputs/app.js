@@ -1,18 +1,19 @@
 const API_ROOT = "https://api.ftcscout.org/rest/v1";
+const TEAM_NUMBER = 7305;
 
 const state = {
-  team: 7305,
+  team: TEAM_NUMBER,
   year: 2026,
   teamInfo: null,
   participation: [],
   details: new Map(),
   opponentStats: new Map(),
+  teamNames: new Map(),
   eventFilter: "all",
 };
 
 const els = {
   form: document.querySelector("#tracker-form"),
-  teamInput: document.querySelector("#team-input"),
   yearInput: document.querySelector("#year-input"),
   eventFilter: document.querySelector("#event-filter"),
   status: document.querySelector("#status"),
@@ -31,15 +32,14 @@ const els = {
 
 els.form.addEventListener("submit", (event) => {
   event.preventDefault();
-  const nextTeam = Number.parseInt(els.teamInput.value, 10);
   const nextYear = Number.parseInt(els.yearInput.value, 10);
 
-  if (!Number.isFinite(nextTeam) || !Number.isFinite(nextYear)) {
-    setStatus("Enter a valid team number and game year.");
+  if (!Number.isFinite(nextYear)) {
+    setStatus("Choose a valid game year.");
     return;
   }
 
-  state.team = nextTeam;
+  state.team = TEAM_NUMBER;
   state.year = nextYear;
   loadTracker();
 });
@@ -55,6 +55,7 @@ async function loadTracker() {
   setLoading();
   state.details = new Map();
   state.opponentStats = new Map();
+  state.teamNames = new Map();
   state.eventFilter = "all";
   els.eventFilter.value = "all";
 
@@ -69,6 +70,7 @@ async function loadTracker() {
     await loadEventDetails();
     state.participation = state.participation.filter((match) => isMatchInGameYear(match));
     state.opponentStats = buildOpponentStats();
+    await loadOpponentTeamNames();
     populateEventFilter();
     render();
     setStatus(`Updated from FTCScout for ${state.year} games.`);
@@ -108,6 +110,29 @@ async function loadEventDetails() {
       });
     } catch (error) {
       console.warn(`Could not load details for ${eventCode}`, error);
+    }
+  });
+
+  await Promise.allSettled(requests);
+}
+
+async function loadOpponentTeamNames() {
+  const opponentNumbers = new Set();
+
+  state.participation.forEach((entry) => {
+    const detail = state.details.get(`${entry.season}:${entry.eventCode}:${entry.matchId}`);
+    (detail?.teams ?? [])
+      .filter((team) => team.alliance !== entry.alliance)
+      .forEach((team) => opponentNumbers.add(team.teamNumber));
+  });
+
+  const requests = [...opponentNumbers].map(async (teamNumber) => {
+    try {
+      const team = await getJson(`${API_ROOT}/teams/${teamNumber}`);
+      state.teamNames.set(teamNumber, team?.name ?? `Team ${teamNumber}`);
+    } catch (error) {
+      console.warn(`Could not load team ${teamNumber}`, error);
+      state.teamNames.set(teamNumber, `Team ${teamNumber}`);
     }
   });
 
@@ -170,6 +195,7 @@ function getRows() {
       const partners = allianceTeams.filter((teamNumber) => teamNumber !== state.team);
       const opponents = opponentTeams.map((teamNumber) => ({
         teamNumber,
+        name: state.teamNames.get(teamNumber) ?? `Team ${teamNumber}`,
         stats: state.opponentStats.get(teamNumber),
       }));
 
@@ -281,6 +307,7 @@ function buildOpponentStats() {
     const redScore = match?.scores?.red?.totalPoints;
     const blueScore = match?.scores?.blue?.totalPoints;
 
+    if (!isDetailInGameYear(match)) return;
     if (!Number.isFinite(redScore) || !Number.isFinite(blueScore)) return;
 
     (match.teams ?? []).forEach((team) => {
@@ -316,14 +343,15 @@ function formatOpponents(opponents) {
 
   return `
     <div class="opponent-list">
-      ${opponents.map(({ teamNumber, stats }) => {
+      ${opponents.map(({ teamNumber, name, stats }) => {
         const record = stats ? `${stats.wins}-${stats.losses}-${stats.ties}` : "0-0-0";
         const stars = stats ? stats.stars : 0;
         const rate = stats ? `${Math.round(stats.winRate * 100)}%` : "--";
 
         return `
           <div class="opponent">
-            <strong>${teamNumber}</strong>
+            <strong>${escapeHtml(name)}</strong>
+            <span>#${teamNumber}</span>
             <span>${record} / ${rate}</span>
             <span class="stars" aria-label="${stars} out of 5 stars">${starRating(stars)}</span>
           </div>
@@ -335,7 +363,16 @@ function formatOpponents(opponents) {
 
 function starRating(stars) {
   const filled = Math.max(0, Math.min(5, stars));
-  return "★".repeat(filled) + "☆".repeat(5 - filled);
+  return "&#9733;".repeat(filled) + "&#9734;".repeat(5 - filled);
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
 function formatMatchName(row) {
@@ -389,6 +426,16 @@ function isMatchInGameYear(match) {
 
   if (Number.isNaN(date.getTime())) {
     return Number(match.season) === state.year - 1;
+  }
+
+  return date.getFullYear() === state.year;
+}
+
+function isDetailInGameYear(match) {
+  const date = new Date(match?.scheduledStartTime ?? match?.createdAt ?? match?.updatedAt);
+
+  if (Number.isNaN(date.getTime())) {
+    return Number(match?.eventSeason) === state.year - 1;
   }
 
   return date.getFullYear() === state.year;
