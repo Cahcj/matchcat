@@ -148,7 +148,6 @@ h2 {
 .toolbar,
 .panel,
 .summary-card,
-.event-card,
 .upcoming-panel {
   border: 1px solid var(--line);
   background: var(--panel);
@@ -229,30 +228,6 @@ select {
   margin: 8px 0 6px;
   font-size: clamp(1.15rem, 2vw, 1.55rem);
   line-height: 1;
-}
-
-.event-strip {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 10px;
-  margin: 10px 0;
-}
-
-.event-card {
-  border-radius: 6px;
-  padding: 14px;
-  border-left: 3px solid var(--blue);
-}
-
-.event-card strong {
-  display: block;
-  font-size: 1.18rem;
-}
-
-.event-card span {
-  color: var(--muted);
-  font-size: 0.84rem;
-  font-weight: 750;
 }
 
 .upcoming-panel {
@@ -519,8 +494,7 @@ td {
   .toolbar,
   .upcoming-panel,
   .panel__header,
-  .summary-card,
-  .event-card {
+  .summary-card {
     padding: 16px;
   }
 }

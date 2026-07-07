@@ -27,7 +27,6 @@ const els = {
   avgScore: document.querySelector("#avg-score"),
   latestMatch: document.querySelector("#latest-match"),
   latestEvent: document.querySelector("#latest-event"),
-  eventStrip: document.querySelector("#event-strip"),
   upcomingCard: document.querySelector("#upcoming-card"),
   matchBody: document.querySelector("#match-body"),
 };
@@ -183,7 +182,6 @@ function render() {
   const pastRows = visibleRows.filter((row) => !isUpcoming(row));
 
   renderSummary(rows, rows);
-  renderEvents(rows);
   renderUpcomingMatch(upcomingMatch);
   renderMatches(pastRows);
 }
@@ -266,35 +264,6 @@ function renderSummary(allRows, visibleRows) {
   els.avgScore.textContent = `Avg alliance score ${average}`;
   els.latestMatch.textContent = latest ? formatMatchName(latest) : "--";
   els.latestEvent.textContent = latest ? `${latest.eventName} / ${formatDate(latest.scheduledStartTime)}` : "Waiting for data";
-}
-
-function renderEvents(rows) {
-  const events = [...rows.reduce((map, row) => {
-    const current = map.get(row.eventKey) ?? {
-      key: row.eventKey,
-      name: row.eventName,
-      matches: 0,
-      wins: 0,
-      scored: [],
-    };
-    current.matches += 1;
-    if (row.result === "Win") current.wins += 1;
-    if (Number.isFinite(row.myScore)) current.scored.push(row.myScore);
-    map.set(row.eventKey, current);
-    return map;
-  }, new Map()).values()].sort((a, b) => a.name.localeCompare(b.name));
-
-  els.eventStrip.innerHTML = events.map((event) => {
-    const avg = event.scored.length
-      ? Math.round(event.scored.reduce((sum, score) => sum + score, 0) / event.scored.length)
-      : "--";
-    return `
-      <article class="event-card">
-        <strong>${escapeHtml(event.name)}</strong>
-        <span>${event.matches} matches / ${event.wins} wins / avg ${avg}</span>
-      </article>
-    `;
-  }).join("");
 }
 
 function renderMatches(rows) {
@@ -528,7 +497,6 @@ function setLoading() {
   els.avgScore.textContent = "Avg alliance score --";
   els.latestMatch.textContent = "--";
   els.latestEvent.textContent = "Waiting for data";
-  els.eventStrip.innerHTML = "";
   els.upcomingCard.innerHTML = `<div class="empty">Loading next match...</div>`;
   els.matchBody.innerHTML = `<tr><td colspan="8" class="empty">Loading matches from FTCScout...</td></tr>`;
   setStatus("Loading FTCScout data...");
