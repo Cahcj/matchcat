@@ -6,9 +6,8 @@
   --panel: #222222;
   --panel-soft: #1a1a1b;
   --line: #373737;
-  --orange: #ff9800;
   --blue: #2388d9;
-  --green: #19a66a;
+  --green: #19c37d;
   --red: #dc4a4a;
   --shadow: 0 24px 70px rgba(0, 0, 0, 0.34);
 }
@@ -53,7 +52,7 @@ a {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at top, rgba(255, 152, 0, 0.08), transparent 34%),
+    radial-gradient(circle at top, rgba(35, 136, 217, 0.16), transparent 34%),
     linear-gradient(180deg, rgba(5, 5, 6, 0.12), rgba(13, 13, 14, 0.72));
 }
 
@@ -68,7 +67,7 @@ a {
 .eyebrow,
 .section-kicker {
   margin: 0 0 10px;
-  color: var(--orange);
+  color: var(--green);
   font-size: 0.78rem;
   font-weight: 850;
   letter-spacing: 0;
@@ -153,8 +152,8 @@ select {
 }
 
 .button--dark {
-  background: var(--orange);
-  color: #111111;
+  background: var(--green);
+  color: #06130d;
 }
 
 .shell {
@@ -199,7 +198,7 @@ select {
   border-radius: 50%;
   background:
     linear-gradient(135deg, rgba(0, 0, 0, 0.24), transparent),
-    var(--orange);
+    var(--green);
 }
 
 .summary-card:nth-child(2)::before {
@@ -468,7 +467,7 @@ td {
 
 .stars {
   grid-column: 1 / -1;
-  color: var(--orange) !important;
+  color: var(--green) !important;
   letter-spacing: 0;
 }
 
