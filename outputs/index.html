@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MatchCat | Team 7305 Match Tracker</title>
+    <meta
+      name="description"
+      content="MatchCat tracks FTC team 7305 matches using live FTCScout data."
+    >
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main>
+      <section class="hero" aria-labelledby="page-title">
+        <img class="hero__image" src="matchcat-hero.png" alt="">
+        <div class="hero__overlay"></div>
+        <div class="hero__content">
+          <p class="eyebrow">FTCScout live tracker</p>
+          <h1 id="page-title">MatchCat</h1>
+          <p class="hero__copy">
+            Team 7305 match schedule, alliance station, scores, event splits,
+            and field status in one sharp little dashboard.
+          </p>
+          <div class="hero__actions">
+            <a class="button button--primary" href="#matches">View matches</a>
+            <a
+              class="button button--ghost"
+              href="https://ftcscout.org/teams/7305"
+              target="_blank"
+              rel="noreferrer"
+            >
+              FTCScout
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <section class="shell">
+        <section class="toolbar" aria-label="Tracker controls">
+          <div>
+            <p class="section-kicker">Tracking</p>
+            <h2 id="team-title">Team 7305</h2>
+          </div>
+          <form class="controls" id="tracker-form">
+            <label>
+              Team
+              <input id="team-input" inputmode="numeric" pattern="[0-9]*" value="7305">
+            </label>
+            <label>
+              Season
+              <input id="season-input" inputmode="numeric" pattern="[0-9]*" value="2025">
+            </label>
+            <label>
+              Event
+              <select id="event-filter">
+                <option value="all">All events</option>
+              </select>
+            </label>
+            <button class="button button--dark" type="submit">Refresh</button>
+          </form>
+        </section>
+
+        <section class="summary-grid" aria-label="Team and match summary">
+          <article class="summary-card">
+            <span>Team</span>
+            <strong id="team-name">Loading...</strong>
+            <small id="team-location">FTC team profile</small>
+          </article>
+          <article class="summary-card">
+            <span>Matches</span>
+            <strong id="match-count">--</strong>
+            <small id="event-count">Across -- events</small>
+          </article>
+          <article class="summary-card">
+            <span>Record</span>
+            <strong id="record-count">--</strong>
+            <small id="avg-score">Avg alliance score --</small>
+          </article>
+          <article class="summary-card">
+            <span>Next/Latest</span>
+            <strong id="latest-match">--</strong>
+            <small id="latest-event">Waiting for data</small>
+          </article>
+        </section>
+
+        <section class="event-strip" id="event-strip" aria-label="Event overview"></section>
+
+        <section class="panel" id="matches">
+          <div class="panel__header">
+            <div>
+              <p class="section-kicker">Matches</p>
+              <h2>Team 7305 Tracker</h2>
+            </div>
+            <div class="status" id="status">Loading FTCScout data...</div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Match</th>
+                  <th>Event</th>
+                  <th>Alliance</th>
+                  <th>Partners</th>
+                  <th>Score</th>
+                  <th>Result</th>
+                  <th>Time</th>
+                  <th>Flags</th>
+                </tr>
+              </thead>
+              <tbody id="match-body"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
