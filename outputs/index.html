@@ -16,22 +16,36 @@
         <img class="hero__image" src="matchcat-hero.png" alt="">
         <div class="hero__overlay"></div>
         <div class="hero__content">
-          <p class="eyebrow">Team 7305 member dashboard</p>
-          <h1 id="page-title">MatchCat</h1>
-          <p class="hero__copy">
-            A focused Clague GearCats dashboard for team 7305 members to review
-            matches, alliance station, scores, opponent names, and strength ratings.
-          </p>
-          <div class="hero__actions">
-            <a class="button button--primary" href="#matches">View matches</a>
-            <a
-              class="button button--ghost"
-              href="https://ftcscout.org/teams/7305"
-              target="_blank"
-              rel="noreferrer"
-            >
-              FTCScout
-            </a>
+          <div class="hero__layout">
+            <div>
+              <p class="eyebrow">Team 7305 member dashboard</p>
+              <h1 id="page-title">MatchCat</h1>
+              <p class="hero__copy">
+                Live FTCScout match view for Clague GearCats scouting.
+              </p>
+            </div>
+            <section class="summary-grid summary-grid--hero" aria-label="Team and match summary">
+              <article class="summary-card">
+                <span>Team</span>
+                <strong id="team-name">Loading...</strong>
+                <small id="team-location">FTC team profile</small>
+              </article>
+              <article class="summary-card">
+                <span>Matches</span>
+                <strong id="match-count">--</strong>
+                <small id="event-count">Across -- events</small>
+              </article>
+              <article class="summary-card">
+                <span>Record</span>
+                <strong id="record-count">--</strong>
+                <small id="avg-score">Avg alliance score --</small>
+              </article>
+              <article class="summary-card summary-card--hidden">
+                <span>Next/Latest</span>
+                <strong id="latest-match">--</strong>
+                <small id="latest-event">Waiting for data</small>
+              </article>
+            </section>
           </div>
         </div>
       </section>
@@ -68,29 +82,6 @@
           <div class="upcoming-card" id="upcoming-card">
             <div class="empty">Loading next match...</div>
           </div>
-        </section>
-
-        <section class="summary-grid" aria-label="Team and match summary">
-          <article class="summary-card">
-            <span>Team</span>
-            <strong id="team-name">Loading...</strong>
-            <small id="team-location">FTC team profile</small>
-          </article>
-          <article class="summary-card">
-            <span>Matches</span>
-            <strong id="match-count">--</strong>
-            <small id="event-count">Across -- events</small>
-          </article>
-          <article class="summary-card">
-            <span>Record</span>
-            <strong id="record-count">--</strong>
-            <small id="avg-score">Avg alliance score --</small>
-          </article>
-          <article class="summary-card">
-            <span>Next/Latest</span>
-            <strong id="latest-match">--</strong>
-            <small id="latest-event">Waiting for data</small>
-          </article>
         </section>
 
         <section class="event-strip" id="event-strip" aria-label="Event overview"></section>
