@@ -64,12 +64,6 @@
                 <option value="2027">2027</option>
               </select>
             </label>
-            <label>
-              Competition
-              <select id="event-filter">
-                <option value="all">All competitions</option>
-              </select>
-            </label>
             <button class="button button--dark" type="submit">Refresh</button>
           </form>
         </section>
@@ -92,7 +86,15 @@
               <p class="section-kicker">Matches</p>
               <h2>Past Matches</h2>
             </div>
-            <div class="status" id="status">Loading FTCScout data...</div>
+            <div class="panel__actions">
+              <label>
+                Competition
+                <select id="event-filter">
+                  <option value="all">All competitions</option>
+                </select>
+              </label>
+              <div class="status" id="status">Loading FTCScout data...</div>
+            </div>
           </div>
           <div class="table-wrap">
             <table>

@@ -166,7 +166,7 @@ h2 {
 
 .controls {
   display: grid;
-  grid-template-columns: 0.8fr 1fr auto;
+  grid-template-columns: minmax(160px, 0.8fr) auto;
   gap: 12px;
   align-items: end;
 }
@@ -329,6 +329,13 @@ select {
   border-bottom: 1px solid var(--line);
 }
 
+.panel__actions {
+  display: grid;
+  grid-template-columns: minmax(220px, 320px) minmax(160px, auto);
+  gap: 14px;
+  align-items: end;
+}
+
 .status {
   max-width: 360px;
   color: var(--muted);
@@ -479,6 +486,11 @@ td {
   .panel__header {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .panel__actions {
+    width: 100%;
+    grid-template-columns: 1fr;
   }
 
   .status {

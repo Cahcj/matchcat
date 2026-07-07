@@ -179,10 +179,10 @@ function render() {
     state.eventFilter === "all"
       ? rows
       : rows.filter((row) => row.eventKey === state.eventFilter);
-  const upcomingMatch = getUpcomingMatch(visibleRows);
+  const upcomingMatch = getUpcomingMatch(rows);
   const pastRows = visibleRows.filter((row) => !isUpcoming(row));
 
-  renderSummary(rows, visibleRows);
+  renderSummary(rows, rows);
   renderEvents(rows);
   renderUpcomingMatch(upcomingMatch);
   renderMatches(pastRows);
