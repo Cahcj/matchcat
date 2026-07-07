@@ -16,47 +16,12 @@
         <img class="hero__image" src="matchcat-hero.png" alt="">
         <div class="hero__overlay"></div>
         <div class="hero__content">
-          <div class="hero__layout">
-            <div>
-              <p class="eyebrow">Team 7305 member dashboard</p>
-              <h1 id="page-title">MatchCat</h1>
-              <p class="hero__copy">
-                Live FTCScout match view for Clague GearCats scouting.
-              </p>
-            </div>
-            <section class="summary-grid summary-grid--hero" aria-label="Team and match summary">
-              <article class="summary-card">
-                <span>Team</span>
-                <strong id="team-name">Loading...</strong>
-                <small id="team-location">FTC team profile</small>
-              </article>
-              <article class="summary-card">
-                <span>Matches</span>
-                <strong id="match-count">--</strong>
-                <small id="event-count">Across -- events</small>
-              </article>
-              <article class="summary-card">
-                <span>Record</span>
-                <strong id="record-count">--</strong>
-                <small id="avg-score">Avg alliance score --</small>
-              </article>
-              <article class="summary-card summary-card--hidden">
-                <span>Next/Latest</span>
-                <strong id="latest-match">--</strong>
-                <small id="latest-event">Waiting for data</small>
-              </article>
-            </section>
-          </div>
-        </div>
-      </section>
-
-      <section class="shell">
-        <section class="toolbar" aria-label="Tracker controls">
-          <div>
-            <p class="section-kicker">Clague GearCats</p>
-            <h2 id="team-title">Team 7305 Members</h2>
-          </div>
-          <form class="controls" id="tracker-form">
+          <p class="eyebrow">Team 7305 member dashboard</p>
+          <h1 id="page-title">MatchCat</h1>
+          <p class="hero__copy">
+            The Clague GearCats match scout for FTCScout schedules, records, ranks, and opponents.
+          </p>
+          <form class="controls hero-controls" id="tracker-form">
             <label>
               Game Year
               <select id="year-input">
@@ -69,12 +34,38 @@
             </label>
             <button class="button button--dark" type="submit">Refresh</button>
           </form>
+        </div>
+      </section>
+
+      <section class="shell">
+        <section class="summary-grid" aria-label="Team and match summary">
+          <article class="summary-card">
+            <span>Team</span>
+            <strong id="team-name">Loading...</strong>
+            <small id="team-location">FTC team profile</small>
+          </article>
+          <article class="summary-card">
+            <span>Matches</span>
+            <strong id="match-count">--</strong>
+            <small id="event-count">Across -- events</small>
+          </article>
+          <article class="summary-card">
+            <span>Record</span>
+            <strong id="record-count">--</strong>
+            <small id="avg-score">Avg alliance score --</small>
+          </article>
+          <article class="summary-card summary-card--hidden">
+            <span>Next/Latest</span>
+            <strong id="latest-match">--</strong>
+            <small id="latest-event">Waiting for data</small>
+          </article>
         </section>
 
         <section class="upcoming-panel" aria-labelledby="upcoming-title">
           <div>
             <p class="section-kicker">Upcoming Match</p>
             <h2 id="upcoming-title">Next for 7305</h2>
+            <span class="team-label" id="team-title">Team 7305 Members</span>
           </div>
           <div class="upcoming-card" id="upcoming-card">
             <div class="empty">Loading next match...</div>
