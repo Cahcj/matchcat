@@ -85,12 +85,10 @@ async function loadTracker() {
 }
 
 async function loadTeamMatchesForGameYear(year) {
-  const candidateSeasons = [...new Set([year - 1, year])];
-  const responses = await Promise.allSettled(
-    candidateSeasons.map((season) =>
-      getJson(`${API_ROOT}/teams/${state.team}/matches?season=${season}`),
-    ),
-  );
+  const season = ftcScoutSeasonForGameYear(year);
+  const responses = await Promise.allSettled([
+    getJson(`${API_ROOT}/teams/${state.team}/matches?season=${season}`),
+  ]);
 
   return responses.flatMap((response) =>
     response.status === "fulfilled" ? normalizeCollection(response.value) : [],
@@ -510,25 +508,15 @@ function formatDate(value) {
 }
 
 function isMatchInGameYear(match) {
-  const detail = state.details.get(`${match.season}:${match.eventCode}:${match.matchId}`);
-  const dateValue = detail?.scheduledStartTime ?? match.createdAt ?? match.updatedAt;
-  const date = new Date(dateValue);
-
-  if (Number.isNaN(date.getTime())) {
-    return Number(match.season) === state.year - 1;
-  }
-
-  return date.getFullYear() === state.year;
+  return Number(match.season) === ftcScoutSeasonForGameYear(state.year);
 }
 
 function isDetailInGameYear(match) {
-  const date = new Date(match?.scheduledStartTime ?? match?.createdAt ?? match?.updatedAt);
+  return Number(match?.eventSeason) === ftcScoutSeasonForGameYear(state.year);
+}
 
-  if (Number.isNaN(date.getTime())) {
-    return Number(match?.eventSeason) === state.year - 1;
-  }
-
-  return date.getFullYear() === state.year;
+function ftcScoutSeasonForGameYear(year) {
+  return Number(year) - 1;
 }
 
 function setLoading() {
