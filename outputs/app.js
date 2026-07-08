@@ -14,6 +14,7 @@ const state = {
   teamEventRanks: new Map(),
   teamNames: new Map(),
   eventFilter: "all",
+  selectedTeam: null,
 };
 
 const els = {
@@ -33,6 +34,10 @@ const els = {
   latestEvent: document.querySelector("#latest-event"),
   upcomingCard: document.querySelector("#upcoming-card"),
   matchBody: document.querySelector("#match-body"),
+  teamDetailPanel: document.querySelector("#team-detail-panel"),
+  teamDetailTitle: document.querySelector("#team-detail-title"),
+  teamDetailBody: document.querySelector("#team-detail-body"),
+  teamDetailClose: document.querySelector("#team-detail-close"),
 };
 
 els.form.addEventListener("submit", (event) => {
@@ -62,6 +67,23 @@ els.eventFilter.addEventListener("change", () => {
   render();
 });
 
+els.teamDetailClose.addEventListener("click", () => {
+  state.selectedTeam = null;
+  renderTeamDetail();
+});
+
+document.addEventListener("click", (event) => {
+  const teamButton = event.target.closest(".team-link");
+  if (!teamButton) return;
+
+  state.selectedTeam = {
+    teamNumber: Number(teamButton.dataset.teamNumber),
+    eventKey: teamButton.dataset.eventKey,
+  };
+  renderTeamDetail();
+  els.teamDetailPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+
 loadTracker();
 
 async function loadTracker() {
@@ -74,6 +96,7 @@ async function loadTracker() {
   state.teamEventRanks = new Map();
   state.teamNames = new Map();
   state.eventFilter = "all";
+  state.selectedTeam = null;
   els.eventFilter.value = "all";
 
   try {
@@ -212,6 +235,7 @@ function render() {
   renderSummary(rows, rows);
   renderClagueRating(visibleRows);
   renderUpcomingMatch(upcomingMatch);
+  renderTeamDetail();
   renderMatches(pastRows);
 }
 
@@ -410,6 +434,119 @@ function renderUpcomingMatch(nextMatch) {
   `;
 }
 
+function renderTeamDetail() {
+  if (!state.selectedTeam?.teamNumber) {
+    els.teamDetailPanel.hidden = true;
+    els.teamDetailBody.innerHTML = "";
+    return;
+  }
+
+  const teamNumber = state.selectedTeam.teamNumber;
+  const teamName = state.teamNames.get(teamNumber) ?? `Team ${teamNumber}`;
+  const eventKeyForCard = getBestDetailEventKey(teamNumber, state.selectedTeam.eventKey);
+  const insight = state.eventTeamInsights.get(teamStatsKey(eventKeyForCard, teamNumber));
+  const stats = state.teamEventStats.get(teamStatsKey(eventKeyForCard, teamNumber));
+  const rows = getTeamEventHistory(teamNumber);
+  const rankRows = rows.length
+    ? rows.map((row) => `
+        <tr>
+          <td>${escapeHtml(row.eventName)}</td>
+          <td>${Number.isFinite(row.rank) ? row.rank : "--"}</td>
+          <td>${Number.isFinite(row.opr) ? row.opr.toFixed(1) : "--"}</td>
+          <td>${Number.isFinite(row.autoOpr) ? row.autoOpr.toFixed(1) : "--"}</td>
+          <td>${Number.isFinite(row.teleopOpr) ? row.teleopOpr.toFixed(1) : "--"}</td>
+          <td>${row.record}</td>
+        </tr>
+      `).join("")
+    : `<tr><td colspan="6" class="empty">No past competition ranking data found for this team.</td></tr>`;
+
+  els.teamDetailPanel.hidden = false;
+  els.teamDetailTitle.textContent = `${teamName} #${teamNumber}`;
+  els.teamDetailBody.innerHTML = `
+    <div class="team-detail__stats">
+      <article>
+        <span>Competition</span>
+        <strong>${escapeHtml(eventDisplayName(eventKeyForCard))}</strong>
+      </article>
+      <article>
+        <span>Total OPR</span>
+        <strong>${formatNumber(insight?.opr)}</strong>
+      </article>
+      <article>
+        <span>Auto OPR</span>
+        <strong>${formatNumber(insight?.autoOpr)}</strong>
+      </article>
+      <article>
+        <span>Teleop OPR</span>
+        <strong>${formatNumber(insight?.teleopOpr)}</strong>
+      </article>
+      <article>
+        <span>Rank</span>
+        <strong>${Number.isFinite(insight?.rank) ? insight.rank : "--"}</strong>
+      </article>
+      <article>
+        <span>Stars</span>
+        <strong>${starRating(stats?.stars ?? insight?.stars ?? 0) || "0 stars"}</strong>
+      </article>
+    </div>
+    <div class="team-detail__table-wrap">
+      <table class="team-detail__table">
+        <thead>
+          <tr>
+            <th>Past Competition</th>
+            <th>Rank</th>
+            <th>OPR</th>
+            <th>Auto OPR</th>
+            <th>Teleop OPR</th>
+            <th>Record</th>
+          </tr>
+        </thead>
+        <tbody>${rankRows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function getBestDetailEventKey(teamNumber, preferredEventKey) {
+  if (state.eventTeamInsights.has(teamStatsKey(preferredEventKey, teamNumber))) {
+    return preferredEventKey;
+  }
+
+  const history = getTeamEventHistory(teamNumber);
+  return history[0]?.eventKey ?? preferredEventKey;
+}
+
+function getTeamEventHistory(teamNumber) {
+  const rows = [];
+
+  state.eventTeamInsights.forEach((insight, key) => {
+    const { eventKey: keyEvent, teamNumber: keyTeam } = parseTeamStatsKey(key);
+    if (keyTeam !== teamNumber) return;
+
+    const stats = state.teamEventStats.get(key);
+    rows.push({
+      eventKey: keyEvent,
+      eventName: eventDisplayName(keyEvent),
+      eventTime: eventSortTime(keyEvent),
+      rank: insight.rank,
+      opr: insight.opr,
+      autoOpr: insight.autoOpr,
+      teleopOpr: insight.teleopOpr,
+      record: stats ? `${stats.wins}-${stats.losses}-${stats.ties}` : "--",
+    });
+  });
+
+  return rows.sort((a, b) => b.eventTime - a.eventTime);
+}
+
+function parseTeamStatsKey(key) {
+  const parts = key.split(":");
+  return {
+    eventKey: `${parts[0]}:${parts[1]}`,
+    teamNumber: Number(parts[2]),
+  };
+}
+
 function getUpcomingMatch(rows) {
   return rows
     .filter((row) => isUpcoming(row))
@@ -433,6 +570,7 @@ function teamStatsKey(key, teamNumber) {
 }
 
 function eventDisplayName(key) {
+  if (!key) return "Selected competition";
   return state.events.get(key)?.name ?? key.split(":")[1] ?? key;
 }
 
@@ -479,6 +617,8 @@ function buildEventTeamInsights() {
       insights.set(teamStatsKey(key, teamNumber), {
         rank,
         opr,
+        autoOpr: Number(report?.stats?.opr?.autoPoints),
+        teleopOpr: Number(report?.stats?.opr?.dcPoints),
         oprScore,
         rankScore,
         winRate,
@@ -599,6 +739,7 @@ function getTeamRating(teamNumber, matchEntry) {
 
   return {
     teamNumber,
+    eventKey: resolved?.stats?.eventKey ?? currentEventKey,
     name: state.teamNames.get(teamNumber) ?? `Team ${teamNumber}`,
     ...resolved,
   };
@@ -636,7 +777,7 @@ function formatTeamRatings(teams) {
 
   return `
     <div class="team-rating-list">
-      ${teams.map(({ teamNumber, name, stats, rank, sourceEventName, isFallback }) => {
+      ${teams.map(({ teamNumber, name, eventKey, stats, rank, sourceEventName, isFallback }) => {
         const record = stats ? `${stats.wins}-${stats.losses}-${stats.ties}` : "0-0-0";
         const stars = stats ? stats.stars : 0;
         const rate = stats ? `${Math.round(stats.winRate * 100)}%` : "--";
@@ -648,7 +789,9 @@ function formatTeamRatings(teams) {
 
         return `
           <div class="team-rating">
-            <strong>${escapeHtml(name)}</strong>
+            <button class="team-link" type="button" data-team-number="${teamNumber}" data-event-key="${escapeHtml(eventKey)}">
+              ${escapeHtml(name)}
+            </button>
             <span>#${teamNumber}${rankLabel}</span>
             <span>${record} / ${rate}${oprLabel}</span>
             <span class="stars" aria-label="${stars} out of 5 stars">${starRating(stars)}</span>
@@ -729,6 +872,10 @@ function formatDate(value) {
     hour: "numeric",
     minute: "2-digit",
   }).format(date);
+}
+
+function formatNumber(value) {
+  return Number.isFinite(value) ? value.toFixed(1) : "--";
 }
 
 function isMatchInGameYear(match) {
