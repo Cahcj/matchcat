@@ -13,6 +13,7 @@ const state = {
   teamEventStats: new Map(),
   teamEventRanks: new Map(),
   teamNames: new Map(),
+  teamSeasonEventCache: new Map(),
   eventFilter: "all",
   selectedTeam: null,
 };
@@ -76,12 +77,7 @@ document.addEventListener("click", (event) => {
   const teamButton = event.target.closest(".team-link");
   if (!teamButton) return;
 
-  state.selectedTeam = {
-    teamNumber: Number(teamButton.dataset.teamNumber),
-    eventKey: teamButton.dataset.eventKey,
-  };
-  renderTeamDetail();
-  els.teamDetailPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+  openTeamDetail(Number(teamButton.dataset.teamNumber), teamButton.dataset.eventKey);
 });
 
 loadTracker();
@@ -95,6 +91,7 @@ async function loadTracker() {
   state.teamEventStats = new Map();
   state.teamEventRanks = new Map();
   state.teamNames = new Map();
+  state.teamSeasonEventCache = new Map();
   state.eventFilter = "all";
   state.selectedTeam = null;
   els.eventFilter.value = "all";
@@ -434,6 +431,64 @@ function renderUpcomingMatch(nextMatch) {
   `;
 }
 
+async function openTeamDetail(teamNumber, eventKeyForCard) {
+  state.selectedTeam = {
+    teamNumber,
+    eventKey: eventKeyForCard,
+    loading: true,
+  };
+  renderTeamDetail();
+  els.teamDetailPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+
+  try {
+    await loadTeamSeasonEvents(teamNumber);
+  } catch (error) {
+    console.warn(`Could not load season events for ${teamNumber}`, error);
+  } finally {
+    if (state.selectedTeam?.teamNumber === teamNumber) {
+      state.selectedTeam.loading = false;
+      renderTeamDetail();
+    }
+  }
+}
+
+async function loadTeamSeasonEvents(teamNumber) {
+  const cacheKey = `${state.year}:${teamNumber}`;
+  if (state.teamSeasonEventCache.has(cacheKey)) return;
+
+  const season = ftcScoutSeasonForGameYear(state.year);
+  const matches = normalizeCollection(
+    await getJson(`${API_ROOT}/teams/${teamNumber}/matches?season=${season}`),
+  );
+  const eventKeys = [...new Set(matches.map((match) => `${match.season}:${match.eventCode}`))];
+  const requests = eventKeys.map(async (key) => {
+    const [eventSeason, eventCode] = key.split(":");
+    const requestsForEvent = [];
+
+    if (!state.events.has(key)) {
+      requestsForEvent.push(
+        getJson(`${API_ROOT}/events/${eventSeason}/${eventCode}`)
+          .then((eventInfo) => state.events.set(key, eventInfo)),
+      );
+    }
+
+    if (!state.eventTeamReports.has(key)) {
+      requestsForEvent.push(
+        getJson(`${API_ROOT}/events/${eventSeason}/${eventCode}/teams`)
+          .then((reports) => state.eventTeamReports.set(key, normalizeCollection(reports))),
+      );
+    }
+
+    await Promise.allSettled(requestsForEvent);
+  });
+
+  await Promise.allSettled(requests);
+  state.eventTeamInsights = buildEventTeamInsights();
+  state.teamEventStats = buildTeamEventStats();
+  state.teamEventRanks = buildTeamEventRanks();
+  state.teamSeasonEventCache.set(cacheKey, true);
+}
+
 function renderTeamDetail() {
   if (!state.selectedTeam?.teamNumber) {
     els.teamDetailPanel.hidden = true;
@@ -447,6 +502,7 @@ function renderTeamDetail() {
   const insight = state.eventTeamInsights.get(teamStatsKey(eventKeyForCard, teamNumber));
   const stats = state.teamEventStats.get(teamStatsKey(eventKeyForCard, teamNumber));
   const rows = getTeamEventHistory(teamNumber);
+  const detailStars = stats?.stars ?? insight?.stars ?? 0;
   const rankRows = rows.length
     ? rows.map((row) => `
         <tr>
@@ -456,13 +512,15 @@ function renderTeamDetail() {
           <td>${Number.isFinite(row.autoOpr) ? row.autoOpr.toFixed(1) : "--"}</td>
           <td>${Number.isFinite(row.teleopOpr) ? row.teleopOpr.toFixed(1) : "--"}</td>
           <td>${row.record}</td>
+          <td><span class="stars">${starRating(row.stars) || "0 stars"}</span></td>
         </tr>
       `).join("")
-    : `<tr><td colspan="6" class="empty">No past competition ranking data found for this team.</td></tr>`;
+    : `<tr><td colspan="7" class="empty">No past competition ranking data found for this team.</td></tr>`;
 
   els.teamDetailPanel.hidden = false;
   els.teamDetailTitle.textContent = `${teamName} #${teamNumber}`;
   els.teamDetailBody.innerHTML = `
+    ${state.selectedTeam.loading ? `<div class="team-detail__loading">Loading all ${state.year} competitions for this team...</div>` : ""}
     <div class="team-detail__stats">
       <article>
         <span>Competition</span>
@@ -486,7 +544,7 @@ function renderTeamDetail() {
       </article>
       <article>
         <span>Stars</span>
-        <strong>${starRating(stats?.stars ?? insight?.stars ?? 0) || "0 stars"}</strong>
+        <strong>${starRating(detailStars) || "0 stars"}</strong>
       </article>
     </div>
     <div class="team-detail__table-wrap">
@@ -499,6 +557,7 @@ function renderTeamDetail() {
             <th>Auto OPR</th>
             <th>Teleop OPR</th>
             <th>Record</th>
+            <th>Stars</th>
           </tr>
         </thead>
         <tbody>${rankRows}</tbody>
@@ -532,7 +591,12 @@ function getTeamEventHistory(teamNumber) {
       opr: insight.opr,
       autoOpr: insight.autoOpr,
       teleopOpr: insight.teleopOpr,
-      record: stats ? `${stats.wins}-${stats.losses}-${stats.ties}` : "--",
+      record: stats
+        ? `${stats.wins}-${stats.losses}-${stats.ties}`
+        : Number.isFinite(insight.played)
+          ? `${insight.wins}-${insight.losses}-${insight.ties}`
+          : "--",
+      stars: stats?.stars ?? insight.stars ?? 0,
     });
   });
 
@@ -619,6 +683,10 @@ function buildEventTeamInsights() {
         opr,
         autoOpr: Number(report?.stats?.opr?.autoPoints),
         teleopOpr: Number(report?.stats?.opr?.dcPoints),
+        wins,
+        losses,
+        ties,
+        played,
         oprScore,
         rankScore,
         winRate,
