@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MatchCat | Team 7305 Member Dashboard</title>
+    <meta
+      name="description"
+      content="MatchCat is a team 7305 member dashboard using live FTCScout data."
+    >
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main>
+      <section class="hero" aria-labelledby="page-title">
+        <img class="hero__image" src="matchcat-hero.png" alt="">
+        <div class="hero__overlay"></div>
+        <div class="hero__content">
+          <p class="eyebrow">Team 7305 member dashboard</p>
+          <h1 id="page-title">MatchCat</h1>
+          <p class="hero__copy">
+            The Clague GearCats match scout for FTCScout schedules, records, ranks, and opponents.
+          </p>
+          <div class="clague-rating" id="clague-rating" aria-live="polite">
+            <span>Clague rating</span>
+            <strong>Loading...</strong>
+            <small>Waiting for FTCScout data</small>
+          </div>
+          <form class="controls hero-controls" id="tracker-form">
+            <label>
+              Season
+              <select id="year-input">
+                <option value="2013">2012-2013 Ring It Up!</option>
+                <option value="2014">2013-2014 Block Party!</option>
+                <option value="2015">2014-2015 Cascade Effect</option>
+                <option value="2016">2015-2016 FIRST RES-Q</option>
+                <option value="2017">2016-2017 Velocity Vortex</option>
+                <option value="2018">2017-2018 FIRST Relic Recovery</option>
+                <option value="2019">2018-2019 Rover Ruckus</option>
+                <option value="2020">2019-2020 SKYSTONE</option>
+                <option value="2021">2020-2021 Ultimate Goal</option>
+                <option value="2022">2021-2022 Freight Frenzy</option>
+                <option value="2023">2022-2023 POWERPLAY</option>
+                <option value="2024">2023-2024 CENTERSTAGE</option>
+                <option value="2025">2024-2025 INTO THE DEEP</option>
+                <option value="2026" selected>2025-2026 DECODE</option>
+                <option value="2027">2026-2027 Game TBA</option>
+              </select>
+            </label>
+            <button class="button button--dark" type="submit">Refresh</button>
+          </form>
+        </div>
+      </section>
+
+      <section class="shell">
+        <section class="summary-grid" aria-label="Team and match summary">
+          <article class="summary-card">
+            <span>Team</span>
+            <strong id="team-name">Loading...</strong>
+            <small id="team-location">FTC team profile</small>
+          </article>
+          <article class="summary-card">
+            <span>Matches</span>
+            <strong id="match-count">--</strong>
+            <small id="event-count">Across -- events</small>
+          </article>
+          <article class="summary-card">
+            <span>Record</span>
+            <strong id="record-count">--</strong>
+            <small id="avg-score">Avg alliance score --</small>
+          </article>
+          <article class="summary-card summary-card--hidden">
+            <span>Next/Latest</span>
+            <strong id="latest-match">--</strong>
+            <small id="latest-event">Waiting for data</small>
+          </article>
+        </section>
+
+        <section class="upcoming-panel" aria-labelledby="upcoming-title">
+          <div>
+            <p class="section-kicker">Upcoming Match</p>
+            <h2 id="upcoming-title">Next for 7305</h2>
+            <span class="team-label" id="team-title">Team 7305 Members</span>
+          </div>
+          <div class="upcoming-card" id="upcoming-card">
+            <div class="empty">Loading next match...</div>
+          </div>
+        </section>
+
+        <section class="panel team-detail-panel" id="team-detail-panel" hidden>
+          <div class="panel__header">
+            <div>
+              <p class="section-kicker">Opponent Tab</p>
+              <h2 id="team-detail-title">Team details</h2>
+            </div>
+            <button class="button button--dark button--small" id="team-detail-close" type="button">Close</button>
+          </div>
+          <div class="team-detail" id="team-detail-body"></div>
+        </section>
+
+        <section class="panel" id="matches">
+          <div class="panel__header">
+            <div>
+              <p class="section-kicker">Matches</p>
+              <h2>Past Matches</h2>
+            </div>
+            <div class="panel__actions">
+              <label>
+                Competition
+                <select id="event-filter">
+                  <option value="all">All competitions</option>
+                </select>
+              </label>
+              <div class="status" id="status">Loading FTCScout data...</div>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Match</th>
+                  <th>Competition</th>
+                  <th>Alliance</th>
+                  <th>Teammates</th>
+                  <th>Opponents</th>
+                  <th>Score</th>
+                  <th>Result</th>
+                  <th>Time</th>
+                </tr>
+              </thead>
+              <tbody id="match-body"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
