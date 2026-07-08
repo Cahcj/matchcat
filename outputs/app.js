@@ -1,5 +1,22 @@
 const API_ROOT = "https://api.ftcscout.org/rest/v1";
 const TEAM_NUMBER = 7305;
+const GAME_SEASONS = {
+  2013: "2012-2013 Ring It Up!",
+  2014: "2013-2014 Block Party!",
+  2015: "2014-2015 Cascade Effect",
+  2016: "2015-2016 FIRST RES-Q",
+  2017: "2016-2017 Velocity Vortex",
+  2018: "2017-2018 FIRST Relic Recovery",
+  2019: "2018-2019 Rover Ruckus",
+  2020: "2019-2020 SKYSTONE",
+  2021: "2020-2021 Ultimate Goal",
+  2022: "2021-2022 Freight Frenzy",
+  2023: "2022-2023 POWERPLAY",
+  2024: "2023-2024 CENTERSTAGE",
+  2025: "2024-2025 INTO THE DEEP",
+  2026: "2025-2026 DECODE",
+  2027: "2026-2027 Game TBA",
+};
 
 const state = {
   team: TEAM_NUMBER,
@@ -112,11 +129,11 @@ async function loadTracker() {
     await loadOpponentTeamNames();
     populateEventFilter();
     render();
-    setStatus(`Updated from FTCScout for ${state.year} games.`);
+    setStatus(`Updated from FTCScout for ${getSeasonLabel(state.year)}.`);
   } catch (error) {
     console.error(error);
     setStatus("FTCScout data could not load right now.");
-    els.matchBody.innerHTML = `<tr><td colspan="8" class="empty">No live data returned for this team and game year.</td></tr>`;
+    els.matchBody.innerHTML = `<tr><td colspan="8" class="empty">No live data returned for this team and season.</td></tr>`;
   }
 }
 
@@ -312,7 +329,7 @@ function renderClagueRating(rows) {
   const rating = getClagueRating(rows);
   const record = rating.record;
   const title = state.eventFilter === "all"
-    ? `${state.year} overall`
+    ? `${getSeasonLabel(state.year)} overall`
     : eventDisplayName(state.eventFilter);
   const stars = record.played ? rating.stars : 0;
   const rate = record.played ? `${Math.round(record.winRate * 100)}% win rate` : "No played matches";
@@ -531,7 +548,7 @@ function renderTeamDetail() {
   els.teamDetailPanel.hidden = false;
   els.teamDetailTitle.textContent = `${teamName} #${teamNumber}`;
   els.teamDetailBody.innerHTML = `
-    ${state.selectedTeam.loading ? `<div class="team-detail__loading">Loading all ${state.year} competitions for this team...</div>` : ""}
+    ${state.selectedTeam.loading ? `<div class="team-detail__loading">Loading all ${getSeasonLabel(state.year)} competitions for this team...</div>` : ""}
     <div class="team-detail__stats">
       <article>
         <span>Competition</span>
@@ -1026,6 +1043,11 @@ function isMatchInGameYear(match) {
 
 function isDetailInGameYear(match) {
   return Number(match?.eventSeason) === ftcScoutSeasonForGameYear(state.year);
+}
+
+function getSeasonLabel(year) {
+  const numericYear = Number(year);
+  return GAME_SEASONS[numericYear] ?? `${numericYear - 1}-${numericYear}`;
 }
 
 function ftcScoutSeasonForGameYear(year) {
