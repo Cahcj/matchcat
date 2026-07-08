@@ -353,7 +353,9 @@ function getClagueRating(rows) {
   return {
     record,
     stars: Math.round(ratingScore * 5),
-    source: eventRatings.length ? "FTCScout OPR + event rankings" : "Match record",
+    source: eventRatings.length
+      ? "FTCScout OPR + event rankings + teammate-adjusted wins"
+      : "Match record",
   };
 }
 
@@ -478,6 +480,15 @@ async function loadTeamSeasonEvents(teamNumber) {
           .then((reports) => state.eventTeamReports.set(key, normalizeCollection(reports))),
       );
     }
+
+    requestsForEvent.push(
+      getJson(`${API_ROOT}/events/${eventSeason}/${eventCode}/matches`)
+        .then((matchesResponse) => {
+          normalizeCollection(matchesResponse).forEach((match) => {
+            state.details.set(`${match.eventSeason}:${eventCode}:${match.id}`, match);
+          });
+        }),
+    );
 
     await Promise.allSettled(requestsForEvent);
   });
@@ -672,10 +683,11 @@ function buildEventTeamInsights() {
       const ties = Number(report?.stats?.ties) || 0;
       const played = Number(report?.stats?.qualMatchesPlayed) || wins + losses + ties;
       const winRate = played ? (wins + ties * 0.5) / played : null;
+      const partnerAdjustedWinRate = getPartnerAdjustedWinRate(key, teamNumber, winRate);
       const ratingScore = weightedRatingScore([
         { value: oprScore, weight: 0.45 },
         { value: rankScore, weight: 0.35 },
-        { value: winRate, weight: 0.2 },
+        { value: partnerAdjustedWinRate, weight: 0.2 },
       ]);
 
       insights.set(teamStatsKey(key, teamNumber), {
@@ -690,9 +702,10 @@ function buildEventTeamInsights() {
         oprScore,
         rankScore,
         winRate,
+        partnerAdjustedWinRate,
         ratingScore,
         stars: Number.isFinite(ratingScore) ? Math.round(ratingScore * 5) : null,
-        source: "FTCScout OPR + event ranking",
+        source: "FTCScout OPR + event ranking + teammate-adjusted wins",
       });
     });
   });
@@ -702,6 +715,64 @@ function buildEventTeamInsights() {
 
 function getOprValue(report) {
   return Number(report?.stats?.opr?.totalPoints ?? report?.stats?.opr?.totalPointsNp);
+}
+
+function getPartnerAdjustedWinRate(key, teamNumber, fallbackWinRate) {
+  const matches = getEventMatches(key).filter((match) =>
+    (match.teams ?? []).some((team) => team.teamNumber === teamNumber),
+  );
+  const ownOpr = state.eventTeamInsights.get(teamStatsKey(key, teamNumber))?.opr
+    ?? getReportOpr(key, teamNumber);
+
+  if (!matches.length || !Number.isFinite(ownOpr)) return fallbackWinRate;
+
+  let score = 0;
+  let played = 0;
+
+  matches.forEach((match) => {
+    const redScore = match?.scores?.red?.totalPoints;
+    const blueScore = match?.scores?.blue?.totalPoints;
+    const team = (match.teams ?? []).find((entry) => entry.teamNumber === teamNumber);
+
+    if (!team || !Number.isFinite(redScore) || !Number.isFinite(blueScore)) return;
+
+    const teamScore = team.alliance === "Red" ? redScore : blueScore;
+    const otherScore = team.alliance === "Red" ? blueScore : redScore;
+    const resultValue = teamScore > otherScore ? 1 : teamScore === otherScore ? 0.5 : 0;
+    const partnerOprs = (match.teams ?? [])
+      .filter((entry) => entry.alliance === team.alliance && entry.teamNumber !== teamNumber)
+      .map((entry) => getReportOpr(key, entry.teamNumber))
+      .filter((value) => Number.isFinite(value));
+    const partnerAverage = partnerOprs.length
+      ? partnerOprs.reduce((sum, value) => sum + value, 0) / partnerOprs.length
+      : null;
+    const teammateFactor = getTeammateFactor(ownOpr, partnerAverage);
+
+    score += resultValue * teammateFactor;
+    played += 1;
+  });
+
+  return played ? score / played : fallbackWinRate;
+}
+
+function getEventMatches(key) {
+  const [eventSeason, eventCode] = key.split(":");
+  return [...state.details.values()].filter((match) =>
+    Number(match?.eventSeason) === Number(eventSeason) && match?.eventCode === eventCode,
+  );
+}
+
+function getReportOpr(key, teamNumber) {
+  const report = normalizeCollection(state.eventTeamReports.get(key))
+    .find((entry) => entry.teamNumber === teamNumber);
+
+  return getOprValue(report);
+}
+
+function getTeammateFactor(ownOpr, partnerAverage) {
+  if (!Number.isFinite(partnerAverage) || partnerAverage <= ownOpr) return 1;
+
+  return Math.max(0.45, Math.min(1, ownOpr / partnerAverage));
 }
 
 function weightedRatingScore(parts) {
