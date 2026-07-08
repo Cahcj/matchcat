@@ -99,6 +99,38 @@ h2 {
   line-height: 1.45;
 }
 
+.clague-rating {
+  width: min(520px, 100%);
+  margin: 24px auto 0;
+  padding: 16px 20px;
+  border: 1px solid rgba(25, 195, 125, 0.24);
+  border-radius: 16px;
+  background: rgba(34, 34, 34, 0.8);
+  box-shadow: var(--shadow);
+}
+
+.clague-rating span,
+.clague-rating small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.clague-rating span {
+  color: var(--green);
+  text-transform: uppercase;
+}
+
+.clague-rating strong {
+  display: block;
+  margin: 5px 0 4px;
+  min-height: 34px;
+  color: var(--green);
+  font-size: clamp(1.7rem, 3vw, 2.35rem);
+  line-height: 1;
+}
+
 .hero-controls {
   width: min(460px, 100%);
   min-height: 62px;

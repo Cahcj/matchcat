@@ -22,6 +22,7 @@ const els = {
   teamTitle: document.querySelector("#team-title"),
   teamName: document.querySelector("#team-name"),
   teamLocation: document.querySelector("#team-location"),
+  clagueRating: document.querySelector("#clague-rating"),
   matchCount: document.querySelector("#match-count"),
   eventCount: document.querySelector("#event-count"),
   recordCount: document.querySelector("#record-count"),
@@ -193,6 +194,7 @@ function render() {
   const pastRows = visibleRows.filter((row) => !isUpcoming(row));
 
   renderSummary(rows, rows);
+  renderClagueRating(visibleRows);
   renderUpcomingMatch(upcomingMatch);
   renderMatches(pastRows);
 }
@@ -267,6 +269,32 @@ function renderSummary(allRows, visibleRows) {
   els.avgScore.textContent = `Avg alliance score ${average}`;
   els.latestMatch.textContent = latest ? formatMatchName(latest) : "--";
   els.latestEvent.textContent = latest ? `${latest.eventName} / ${formatDate(latest.scheduledStartTime)}` : "Waiting for data";
+}
+
+function renderClagueRating(rows) {
+  const record = getTeamRecord(rows);
+  const title = state.eventFilter === "all"
+    ? `${state.year} overall`
+    : eventDisplayName(state.eventFilter);
+  const stars = record.played ? Math.round(record.winRate * 5) : 0;
+  const rate = record.played ? `${Math.round(record.winRate * 100)}% win rate` : "No played matches";
+  const starText = starRating(stars) || "0 stars";
+
+  els.clagueRating.innerHTML = `
+    <span>Clague rating</span>
+    <strong class="clague-rating__stars" aria-label="${stars} out of 5 stars">${starText}</strong>
+    <small>${escapeHtml(title)} / ${record.played ? `${record.wins}-${record.losses}-${record.ties}` : "0-0-0"} / ${rate}</small>
+  `;
+}
+
+function getTeamRecord(rows) {
+  const played = rows.filter((row) => row.result === "Win" || row.result === "Loss" || row.result === "Tie");
+  const wins = played.filter((row) => row.result === "Win").length;
+  const losses = played.filter((row) => row.result === "Loss").length;
+  const ties = played.filter((row) => row.result === "Tie").length;
+  const winRate = played.length ? (wins + ties * 0.5) / played.length : 0;
+
+  return { wins, losses, ties, played: played.length, winRate };
 }
 
 function renderMatches(rows) {
@@ -601,6 +629,11 @@ function setLoading() {
   els.avgScore.textContent = "Avg alliance score --";
   els.latestMatch.textContent = "--";
   els.latestEvent.textContent = "Waiting for data";
+  els.clagueRating.innerHTML = `
+    <span>Clague rating</span>
+    <strong>Loading...</strong>
+    <small>Waiting for FTCScout data</small>
+  `;
   els.upcomingCard.innerHTML = `<div class="empty">Loading next match...</div>`;
   els.matchBody.innerHTML = `<tr><td colspan="8" class="empty">Loading matches from FTCScout...</td></tr>`;
   setStatus("Loading FTCScout data...");
