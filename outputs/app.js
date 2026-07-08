@@ -770,7 +770,9 @@ function getReportOpr(key, teamNumber) {
 }
 
 function getTeammateFactor(ownOpr, partnerAverage) {
-  if (!Number.isFinite(partnerAverage) || partnerAverage <= ownOpr) return 1;
+  if (!Number.isFinite(partnerAverage)) return 1;
+  if (partnerAverage <= 0) return 1.25;
+  if (partnerAverage < ownOpr) return Math.min(1.25, Math.sqrt(ownOpr / partnerAverage));
 
   return Math.max(0.45, Math.min(1, ownOpr / partnerAverage));
 }
@@ -780,7 +782,8 @@ function weightedRatingScore(parts) {
   const totalWeight = validParts.reduce((sum, part) => sum + part.weight, 0);
 
   if (!totalWeight) return null;
-  return validParts.reduce((sum, part) => sum + part.value * part.weight, 0) / totalWeight;
+  const score = validParts.reduce((sum, part) => sum + part.value * part.weight, 0) / totalWeight;
+  return Math.max(0, Math.min(1, score));
 }
 
 function buildTeamEventStats() {
