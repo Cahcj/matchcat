@@ -8,6 +8,8 @@ const state = {
   participation: [],
   details: new Map(),
   events: new Map(),
+  eventTeamReports: new Map(),
+  eventTeamInsights: new Map(),
   teamEventStats: new Map(),
   teamEventRanks: new Map(),
   teamNames: new Map(),
@@ -66,6 +68,8 @@ async function loadTracker() {
   setLoading();
   state.details = new Map();
   state.events = new Map();
+  state.eventTeamReports = new Map();
+  state.eventTeamInsights = new Map();
   state.teamEventStats = new Map();
   state.teamEventRanks = new Map();
   state.teamNames = new Map();
@@ -82,6 +86,7 @@ async function loadTracker() {
     state.participation = seasonMatches;
     await loadEventDetails();
     state.participation = state.participation.filter((match) => isMatchInGameYear(match));
+    state.eventTeamInsights = buildEventTeamInsights();
     state.teamEventStats = buildTeamEventStats();
     state.teamEventRanks = buildTeamEventRanks();
     await loadOpponentTeamNames();
@@ -113,12 +118,23 @@ async function loadEventDetails() {
   const requests = eventKeys.map(async (eventKey) => {
     const [season, eventCode] = eventKey.split(":");
     try {
-      const response = await getJson(
-        `${API_ROOT}/events/${season}/${eventCode}/matches`,
-      );
-      const eventInfo = await getJson(`${API_ROOT}/events/${season}/${eventCode}`);
-      const matches = normalizeCollection(response);
-      state.events.set(`${season}:${eventCode}`, eventInfo);
+      const [matchesResponse, eventInfoResponse, eventTeamsResponse] = await Promise.allSettled([
+        getJson(`${API_ROOT}/events/${season}/${eventCode}/matches`),
+        getJson(`${API_ROOT}/events/${season}/${eventCode}`),
+        getJson(`${API_ROOT}/events/${season}/${eventCode}/teams`),
+      ]);
+
+      if (eventInfoResponse.status === "fulfilled") {
+        state.events.set(`${season}:${eventCode}`, eventInfoResponse.value);
+      }
+
+      if (eventTeamsResponse.status === "fulfilled") {
+        state.eventTeamReports.set(`${season}:${eventCode}`, normalizeCollection(eventTeamsResponse.value));
+      }
+
+      const matches = matchesResponse.status === "fulfilled"
+        ? normalizeCollection(matchesResponse.value)
+        : [];
       matches.forEach((match) => {
         state.details.set(`${match.eventSeason}:${eventCode}:${match.id}`, match);
       });
@@ -272,19 +288,52 @@ function renderSummary(allRows, visibleRows) {
 }
 
 function renderClagueRating(rows) {
-  const record = getTeamRecord(rows);
+  const rating = getClagueRating(rows);
+  const record = rating.record;
   const title = state.eventFilter === "all"
     ? `${state.year} overall`
     : eventDisplayName(state.eventFilter);
-  const stars = record.played ? Math.round(record.winRate * 5) : 0;
+  const stars = record.played ? rating.stars : 0;
   const rate = record.played ? `${Math.round(record.winRate * 100)}% win rate` : "No played matches";
   const starText = starRating(stars) || "0 stars";
 
   els.clagueRating.innerHTML = `
     <span>Clague rating</span>
     <strong class="clague-rating__stars" aria-label="${stars} out of 5 stars">${starText}</strong>
-    <small>${escapeHtml(title)} / ${record.played ? `${record.wins}-${record.losses}-${record.ties}` : "0-0-0"} / ${rate}</small>
+    <small>${escapeHtml(title)} / ${record.played ? `${record.wins}-${record.losses}-${record.ties}` : "0-0-0"} / ${rate} / ${escapeHtml(rating.source)}</small>
   `;
+}
+
+function getClagueRating(rows) {
+  const record = getTeamRecord(rows);
+  const eventKeys = [...new Set(rows.map((row) => row.eventKey))];
+
+  if (state.eventFilter !== "all") {
+    const eventStats = state.teamEventStats.get(teamStatsKey(state.eventFilter, state.team));
+    const ratingScore = Number.isFinite(eventStats?.ratingScore)
+      ? eventStats.ratingScore
+      : record.winRate;
+
+    return {
+      record,
+      stars: Math.round(ratingScore * 5),
+      source: eventStats?.ratingSource ?? "Match record",
+    };
+  }
+
+  const eventRatings = eventKeys
+    .map((key) => state.teamEventStats.get(teamStatsKey(key, state.team)))
+    .filter((stats) => Number.isFinite(stats?.ratingScore) && stats.played);
+  const totalPlayed = eventRatings.reduce((sum, stats) => sum + stats.played, 0);
+  const ratingScore = totalPlayed
+    ? eventRatings.reduce((sum, stats) => sum + stats.ratingScore * stats.played, 0) / totalPlayed
+    : record.winRate;
+
+  return {
+    record,
+    stars: Math.round(ratingScore * 5),
+    source: eventRatings.length ? "FTCScout OPR + event rankings" : "Match record",
+  };
 }
 
 function getTeamRecord(rows) {
@@ -394,6 +443,67 @@ function eventSortTime(key) {
   return Number.isNaN(time) ? Number.NEGATIVE_INFINITY : time;
 }
 
+function buildEventTeamInsights() {
+  const insights = new Map();
+
+  state.eventTeamReports.forEach((reports, key) => {
+    const rows = normalizeCollection(reports);
+    const oprValues = rows
+      .map((report) => getOprValue(report))
+      .filter((value) => Number.isFinite(value));
+    const minOpr = oprValues.length ? Math.min(...oprValues) : null;
+    const maxOpr = oprValues.length ? Math.max(...oprValues) : null;
+    const teamCount = rows.length;
+
+    rows.forEach((report) => {
+      const teamNumber = report.teamNumber;
+      const rank = Number(report?.stats?.rank);
+      const opr = getOprValue(report);
+      const rankScore = Number.isFinite(rank) && teamCount > 1
+        ? 1 - ((rank - 1) / (teamCount - 1))
+        : null;
+      const oprScore = Number.isFinite(opr) && Number.isFinite(minOpr) && Number.isFinite(maxOpr) && maxOpr > minOpr
+        ? (opr - minOpr) / (maxOpr - minOpr)
+        : null;
+      const wins = Number(report?.stats?.wins) || 0;
+      const losses = Number(report?.stats?.losses) || 0;
+      const ties = Number(report?.stats?.ties) || 0;
+      const played = Number(report?.stats?.qualMatchesPlayed) || wins + losses + ties;
+      const winRate = played ? (wins + ties * 0.5) / played : null;
+      const ratingScore = weightedRatingScore([
+        { value: oprScore, weight: 0.45 },
+        { value: rankScore, weight: 0.35 },
+        { value: winRate, weight: 0.2 },
+      ]);
+
+      insights.set(teamStatsKey(key, teamNumber), {
+        rank,
+        opr,
+        oprScore,
+        rankScore,
+        winRate,
+        ratingScore,
+        stars: Number.isFinite(ratingScore) ? Math.round(ratingScore * 5) : null,
+        source: "FTCScout OPR + event ranking",
+      });
+    });
+  });
+
+  return insights;
+}
+
+function getOprValue(report) {
+  return Number(report?.stats?.opr?.totalPoints ?? report?.stats?.opr?.totalPointsNp);
+}
+
+function weightedRatingScore(parts) {
+  const validParts = parts.filter((part) => Number.isFinite(part.value));
+  const totalWeight = validParts.reduce((sum, part) => sum + part.weight, 0);
+
+  if (!totalWeight) return null;
+  return validParts.reduce((sum, part) => sum + part.value * part.weight, 0) / totalWeight;
+}
+
 function buildTeamEventStats() {
   const stats = new Map();
 
@@ -427,10 +537,15 @@ function buildTeamEventStats() {
   });
 
   stats.forEach((record) => {
+    const insight = state.eventTeamInsights.get(teamStatsKey(record.eventKey, record.teamNumber));
+
     record.winRate = record.played
       ? (record.wins + record.ties * 0.5) / record.played
       : 0;
-    record.stars = Math.round(record.winRate * 5);
+    record.opr = insight?.opr ?? null;
+    record.ratingScore = Number.isFinite(insight?.ratingScore) ? insight.ratingScore : record.winRate;
+    record.ratingSource = insight?.source ?? "Match record";
+    record.stars = Math.round(record.ratingScore * 5);
   });
 
   return stats;
@@ -441,6 +556,13 @@ function buildTeamEventRanks() {
   const groupedStats = new Map();
 
   state.teamEventStats.forEach((record) => {
+    const insight = state.eventTeamInsights.get(teamStatsKey(record.eventKey, record.teamNumber));
+
+    if (Number.isFinite(insight?.rank)) {
+      ranks.set(teamStatsKey(record.eventKey, record.teamNumber), insight.rank);
+      return;
+    }
+
     const records = groupedStats.get(record.eventKey) ?? [];
     records.push(record);
     groupedStats.set(record.eventKey, records);
@@ -519,6 +641,7 @@ function formatTeamRatings(teams) {
         const stars = stats ? stats.stars : 0;
         const rate = stats ? `${Math.round(stats.winRate * 100)}%` : "--";
         const rankLabel = Number.isFinite(rank) ? ` / rank ${rank}` : "";
+        const oprLabel = Number.isFinite(stats?.opr) ? ` / OPR ${stats.opr.toFixed(1)}` : "";
         const sourceLabel = isFallback && sourceEventName
           ? `<span class="rating-source">Stars from ${escapeHtml(sourceEventName)}</span>`
           : "";
@@ -527,7 +650,7 @@ function formatTeamRatings(teams) {
           <div class="team-rating">
             <strong>${escapeHtml(name)}</strong>
             <span>#${teamNumber}${rankLabel}</span>
-            <span>${record} / ${rate}</span>
+            <span>${record} / ${rate}${oprLabel}</span>
             <span class="stars" aria-label="${stars} out of 5 stars">${starRating(stars)}</span>
             ${sourceLabel}
           </div>
