@@ -32,6 +32,7 @@ const state = {
   teamNames: new Map(),
   teamSeasonEventCache: new Map(),
   eventFilter: "all",
+  picksEventFilter: "all",
   selectedTeam: null,
 };
 
@@ -39,6 +40,7 @@ const els = {
   form: document.querySelector("#tracker-form"),
   yearInput: document.querySelector("#year-input"),
   eventFilter: document.querySelector("#event-filter"),
+  picksEventFilter: document.querySelector("#picks-event-filter"),
   status: document.querySelector("#status"),
   teamTitle: document.querySelector("#team-title"),
   teamName: document.querySelector("#team-name"),
@@ -91,6 +93,11 @@ function refreshSelectedYear() {
 els.eventFilter.addEventListener("change", () => {
   state.eventFilter = els.eventFilter.value;
   render();
+});
+
+els.picksEventFilter.addEventListener("change", () => {
+  state.picksEventFilter = els.picksEventFilter.value;
+  renderPicks();
 });
 
 els.teamDetailClose.addEventListener("click", () => {
@@ -162,8 +169,10 @@ async function loadTracker() {
   state.teamNames = new Map();
   state.teamSeasonEventCache = new Map();
   state.eventFilter = "all";
+  state.picksEventFilter = "all";
   state.selectedTeam = null;
   els.eventFilter.value = "all";
+  els.picksEventFilter.value = "all";
 
   try {
     const [teamInfo, seasonMatches] = await Promise.all([
@@ -180,6 +189,7 @@ async function loadTracker() {
     state.teamEventRanks = buildTeamEventRanks();
     await loadOpponentTeamNames();
     populateEventFilter();
+    populatePicksEventFilter();
     render();
     setStatus(`Updated from FTCScout for ${getSeasonLabel(state.year)}.`);
   } catch (error) {
@@ -220,7 +230,16 @@ async function loadEventDetails() {
       }
 
       if (eventTeamsResponse.status === "fulfilled") {
-        state.eventTeamReports.set(`${season}:${eventCode}`, normalizeCollection(eventTeamsResponse.value));
+        const eventReports = normalizeCollection(eventTeamsResponse.value);
+        state.eventTeamReports.set(`${season}:${eventCode}`, eventReports);
+        eventReports.forEach((report) => {
+          const teamNumber = Number(report?.teamNumber);
+          const name = getReportTeamName(report);
+
+          if (Number.isFinite(teamNumber) && name) {
+            state.teamNames.set(teamNumber, name);
+          }
+        });
       }
 
       const matches = matchesResponse.status === "fulfilled"
@@ -275,12 +294,7 @@ function normalizeCollection(response) {
 }
 
 function populateEventFilter() {
-  const events = [...new Map(
-    state.participation.map((match) => {
-      const key = eventKey(match);
-      return [key, { key, name: eventName(match), code: match.eventCode }];
-    }),
-  ).values()].sort((a, b) => a.name.localeCompare(b.name));
+  const events = getLoadedEvents();
 
   els.eventFilter.innerHTML = `<option value="all">All competitions</option>`;
   events.forEach((event) => {
@@ -289,6 +303,27 @@ function populateEventFilter() {
     option.textContent = event.name;
     els.eventFilter.append(option);
   });
+}
+
+function populatePicksEventFilter() {
+  const events = getLoadedEvents();
+
+  els.picksEventFilter.innerHTML = `<option value="all">All loaded competitions</option>`;
+  events.forEach((event) => {
+    const option = document.createElement("option");
+    option.value = event.key;
+    option.textContent = event.name;
+    els.picksEventFilter.append(option);
+  });
+}
+
+function getLoadedEvents() {
+  return [...new Map(
+    state.participation.map((match) => {
+      const key = eventKey(match);
+      return [key, { key, name: eventName(match), code: match.eventCode }];
+    }),
+  ).values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function render() {
@@ -304,7 +339,7 @@ function render() {
   renderClagueRating(visibleRows);
   renderUpcomingMatch(upcomingMatch);
   renderTeamDetail();
-  renderPicks(visibleRows);
+  renderPicks();
   renderMatches(pastRows);
 }
 
@@ -514,14 +549,14 @@ function renderUpcomingMatch(nextMatch) {
   `;
 }
 
-function renderPicks(rows) {
-  const picks = getPickCandidates(rows).slice(0, 12);
-  const scope = state.eventFilter === "all"
+function renderPicks() {
+  const picks = getPickCandidates().slice(0, 10);
+  const scope = state.picksEventFilter === "all"
     ? getSeasonLabel(state.year)
-    : eventDisplayName(state.eventFilter);
+    : eventDisplayName(state.picksEventFilter);
 
   els.picksStatus.textContent = picks.length
-    ? `Best options for ${scope}.`
+    ? `Top ${picks.length} playoff alliance picks for ${scope}.`
     : `No pick data found for ${scope}.`;
 
   if (!picks.length) {
@@ -537,7 +572,7 @@ function renderPicks(rows) {
           <span>${pick.teamNumber}</span>
           ${escapeHtml(pick.name)}
         </button>
-        <div class="pick-card__meta">${escapeHtml(pick.eventName)} / ${pick.record} / ${pick.winRate}% win rate</div>
+        <div class="pick-card__meta">${escapeHtml(pick.eventName)} / ${pick.record} / ${pick.winRate}% win rate / ${escapeHtml(pick.source)}</div>
         <div class="stars" aria-label="${pick.stars} out of 5 stars">${starRating(pick.stars)}</div>
       </div>
       <div class="pick-card__stats">
@@ -549,41 +584,30 @@ function renderPicks(rows) {
   `).join("");
 }
 
-function getPickCandidates(rows) {
-  const visibleEventKeys = new Set(rows.map((row) => row.eventKey));
+function getPickCandidates() {
+  const eventKeys = state.picksEventFilter === "all"
+    ? getLoadedEvents().map((event) => event.key)
+    : [state.picksEventFilter];
   const bestByTeam = new Map();
 
-  state.teamEventStats.forEach((stats) => {
-    if (stats.teamNumber === TEAM_NUMBER || !stats.played) return;
-    if (visibleEventKeys.size && !visibleEventKeys.has(stats.eventKey)) return;
+  eventKeys.forEach((key) => {
+    const reports = normalizeCollection(state.eventTeamReports.get(key));
+    const teamNumbers = new Set(reports.map((report) => Number(report?.teamNumber)).filter(Number.isFinite));
 
-    const rank = state.teamEventRanks.get(teamStatsKey(stats.eventKey, stats.teamNumber));
-    const rankScore = Number.isFinite(rank) ? 1 / Math.max(rank, 1) : 0;
-    const oprScore = Number.isFinite(stats.opr) ? Math.min(1, Math.max(0, stats.opr / 120)) : 0;
-    const ratingScore = Number.isFinite(stats.ratingScore) ? stats.ratingScore : stats.winRate;
-    const pickScore = weightedRatingScore([
-      { value: ratingScore, weight: 0.5 },
-      { value: oprScore, weight: 0.28 },
-      { value: stats.winRate, weight: 0.14 },
-      { value: rankScore, weight: 0.08 },
-    ]);
-    const current = {
-      teamNumber: stats.teamNumber,
-      name: state.teamNames.get(stats.teamNumber) ?? `Team ${stats.teamNumber}`,
-      eventKey: stats.eventKey,
-      eventName: eventDisplayName(stats.eventKey),
-      rank,
-      opr: stats.opr,
-      stars: stats.stars ?? Math.round((pickScore ?? 0) * 5),
-      record: `${stats.wins}-${stats.losses}-${stats.ties}`,
-      winRate: Math.round(stats.winRate * 100),
-      pickScore: pickScore ?? 0,
-    };
-    const previous = bestByTeam.get(stats.teamNumber);
+    state.teamEventStats.forEach((stats) => {
+      if (stats.eventKey === key) teamNumbers.add(stats.teamNumber);
+    });
 
-    if (!previous || current.pickScore > previous.pickScore) {
-      bestByTeam.set(stats.teamNumber, current);
-    }
+    teamNumbers.forEach((teamNumber) => {
+      if (teamNumber === TEAM_NUMBER) return;
+
+      const current = buildPickCandidate(key, teamNumber, reports);
+      const previous = bestByTeam.get(teamNumber);
+
+      if (current && (!previous || current.pickScore > previous.pickScore)) {
+        bestByTeam.set(teamNumber, current);
+      }
+    });
   });
 
   return [...bestByTeam.values()].sort((a, b) =>
@@ -592,6 +616,55 @@ function getPickCandidates(rows) {
     (a.rank ?? Number.POSITIVE_INFINITY) - (b.rank ?? Number.POSITIVE_INFINITY) ||
     a.teamNumber - b.teamNumber,
   );
+}
+
+function buildPickCandidate(eventKeyForPick, teamNumber, reports) {
+  const stats = state.teamEventStats.get(teamStatsKey(eventKeyForPick, teamNumber));
+  const insight = state.eventTeamInsights.get(teamStatsKey(eventKeyForPick, teamNumber));
+  const report = reports.find((entry) => Number(entry?.teamNumber) === teamNumber);
+  const rank = state.teamEventRanks.get(teamStatsKey(eventKeyForPick, teamNumber))
+    ?? insight?.rank
+    ?? Number(report?.stats?.rank);
+  const opr = stats?.opr ?? insight?.opr ?? getOprValue(report);
+  const wins = stats?.wins ?? Number(report?.stats?.wins) ?? 0;
+  const losses = stats?.losses ?? Number(report?.stats?.losses) ?? 0;
+  const ties = stats?.ties ?? Number(report?.stats?.ties) ?? 0;
+  const reportPlayed = Number(report?.stats?.qualMatchesPlayed);
+  const played = Number.isFinite(stats?.played)
+    ? stats.played
+    : Number.isFinite(reportPlayed)
+      ? reportPlayed
+      : wins + losses + ties;
+  const winRate = played ? (wins + ties * 0.5) / played : 0;
+  const rankScore = Number.isFinite(rank) ? 1 / Math.max(rank, 1) : 0;
+  const oprScore = Number.isFinite(opr) ? Math.min(1, Math.max(0, opr / 120)) : 0;
+  const ratingScore = Number.isFinite(stats?.ratingScore)
+    ? stats.ratingScore
+    : Number.isFinite(insight?.ratingScore)
+      ? insight.ratingScore
+      : winRate;
+  const pickScore = weightedRatingScore([
+    { value: ratingScore, weight: 0.48 },
+    { value: oprScore, weight: 0.3 },
+    { value: winRate, weight: 0.14 },
+    { value: rankScore, weight: 0.08 },
+  ]);
+
+  if (!Number.isFinite(pickScore)) return null;
+
+  return {
+    teamNumber,
+    name: state.teamNames.get(teamNumber) ?? getReportTeamName(report) ?? `Team ${teamNumber}`,
+    eventKey: eventKeyForPick,
+    eventName: eventDisplayName(eventKeyForPick),
+    rank,
+    opr,
+    stars: stats?.stars ?? insight?.stars ?? Math.round(pickScore * 5),
+    record: `${wins}-${losses}-${ties}`,
+    winRate: Math.round(winRate * 100),
+    pickScore,
+    source: Number.isFinite(opr) ? "OPR + rank + record" : "Rank + record",
+  };
 }
 
 async function openTeamDetail(teamNumber, eventKeyForCard) {
@@ -876,6 +949,15 @@ function buildEventTeamInsights() {
 
 function getOprValue(report) {
   return Number(report?.stats?.opr?.totalPoints ?? report?.stats?.opr?.totalPointsNp);
+}
+
+function getReportTeamName(report) {
+  return report?.team?.name
+    ?? report?.name
+    ?? report?.teamName
+    ?? report?.nickname
+    ?? report?.displayName
+    ?? null;
 }
 
 function getPartnerAdjustedWinRate(key, teamNumber, fallbackWinRate) {
