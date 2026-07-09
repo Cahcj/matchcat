@@ -123,9 +123,70 @@ main {
 
 .picks-backdrop[hidden],
 .picks-menu[hidden],
+.auto-team-menu[hidden],
 .auto-backdrop[hidden],
 .auto-menu[hidden] {
-  display: none;
+  display: none !important;
+}
+
+.auto-team-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 82;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  pointer-events: none;
+}
+
+.auto-team-card {
+  width: min(100%, 430px);
+  display: grid;
+  gap: 18px;
+  border: 1px solid rgba(25, 195, 125, 0.24);
+  border-radius: 16px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  padding: 24px;
+  pointer-events: auto;
+}
+
+.auto-team-card h2 {
+  margin: 4px 0 0;
+  font-size: 1.5rem;
+  line-height: 1.05;
+}
+
+.auto-team-card label {
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.auto-team-card input {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-soft);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 800;
+  padding: 0 12px;
+}
+
+.auto-team-card input:focus {
+  border-color: rgba(25, 195, 125, 0.56);
+  outline: none;
+}
+
+.auto-team-actions,
+.auto-menu__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .picks-menu,
@@ -153,6 +214,14 @@ main {
   gap: 16px;
   border-bottom: 1px solid var(--line);
   padding: 22px 26px;
+}
+
+.auto-menu__header small {
+  display: block;
+  margin-top: 5px;
+  color: var(--green);
+  font-size: 0.78rem;
+  font-weight: 900;
 }
 
 .picks-menu__status {
@@ -183,7 +252,7 @@ main {
 
 .auto-toolbar {
   display: grid;
-  grid-template-columns: minmax(280px, auto) minmax(150px, 200px) minmax(160px, 220px) auto;
+  grid-template-columns: minmax(280px, auto) minmax(150px, 200px) minmax(160px, 220px) auto auto;
   gap: 12px;
   align-items: center;
   border-bottom: 1px solid var(--line);
@@ -240,6 +309,14 @@ main {
 .auto-toolbar input[type="range"] {
   width: 100%;
   accent-color: var(--green);
+}
+
+.auto-save-status {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
 }
 
 .auto-stage {

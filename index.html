@@ -52,13 +52,34 @@
       </div>
     </section>
     <div class="auto-backdrop" id="auto-backdrop" hidden></div>
+    <section class="auto-team-menu" id="auto-team-menu" aria-labelledby="auto-team-title" hidden>
+      <form class="auto-team-card" id="auto-team-form">
+        <div>
+          <p class="section-kicker">Autonomous</p>
+          <h2 id="auto-team-title">What team is this?</h2>
+        </div>
+        <label>
+          Team number or name
+          <input id="auto-team-input" type="text" inputmode="text" autocomplete="off" placeholder="7305 or team name">
+        </label>
+        <div class="auto-team-actions">
+          <button class="button button--dark button--small" id="auto-team-test" type="button">Test Team</button>
+          <button class="button button--small" type="submit">Start Drawing</button>
+        </div>
+        <p class="auto-save-status" id="auto-team-status">Saved drawings stay on this device.</p>
+      </form>
+    </section>
     <section class="auto-menu" id="auto-menu" aria-labelledby="auto-title" hidden>
       <div class="auto-menu__header">
         <div>
           <p class="section-kicker">Autonomous</p>
           <h2 id="auto-title">Auto Draw</h2>
+          <small id="auto-current-team">No team selected</small>
         </div>
-        <button class="button button--dark button--small" id="auto-close" type="button">Close</button>
+        <div class="auto-menu__actions">
+          <button class="button button--dark button--small" id="auto-change-team" type="button">Change Team</button>
+          <button class="button button--dark button--small" id="auto-close" type="button">Close</button>
+        </div>
       </div>
       <div class="auto-toolbar" aria-label="Autonomous drawing controls">
         <div class="auto-toolbar__group">
@@ -79,7 +100,9 @@
           Size
           <input id="auto-size" type="range" min="3" max="28" value="9">
         </label>
+        <button class="button button--dark button--small" id="auto-save" type="button">Save Auto</button>
         <button class="button button--dark button--small" id="auto-download" type="button">Download</button>
+        <p class="auto-save-status" id="auto-save-status">Choose a team to save.</p>
       </div>
       <div class="auto-stage">
         <canvas id="auto-canvas" width="1440" height="1440" aria-label="Draw autonomous path"></canvas>

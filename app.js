@@ -1,6 +1,7 @@
 const API_ROOT = "https://api.ftcscout.org/rest/v1";
 const TEAM_NUMBER = 7305;
 const AUTO_FIELD_IMAGE_SRC = "auto-field.png";
+const AUTO_STORAGE_KEY = "matchcat:auto-drawings:v1";
 const AUTO_ROBOT_SIZE = 78;
 const AUTO_ROBOT_SPEED = 430;
 const AUTO_ROBOTS = {
@@ -58,6 +59,8 @@ const state = {
   },
   autoRobotFrame: null,
   autoRobotLastTime: 0,
+  autoTeamKey: "",
+  autoTeamLabel: "",
   selectedTeam: null,
 };
 
@@ -91,10 +94,17 @@ const els = {
   picksOpen: document.querySelector("#picks-open"),
   picksClose: document.querySelector("#picks-close"),
   picksBackdrop: document.querySelector("#picks-backdrop"),
+  autoTeamMenu: document.querySelector("#auto-team-menu"),
+  autoTeamForm: document.querySelector("#auto-team-form"),
+  autoTeamInput: document.querySelector("#auto-team-input"),
+  autoTeamTest: document.querySelector("#auto-team-test"),
+  autoTeamStatus: document.querySelector("#auto-team-status"),
   autoMenu: document.querySelector("#auto-menu"),
   autoOpen: document.querySelector("#auto-open"),
   autoClose: document.querySelector("#auto-close"),
+  autoChangeTeam: document.querySelector("#auto-change-team"),
   autoBackdrop: document.querySelector("#auto-backdrop"),
+  autoCurrentTeam: document.querySelector("#auto-current-team"),
   autoCanvas: document.querySelector("#auto-canvas"),
   autoRobotOne: document.querySelector("#auto-robot-one"),
   autoRobotTwo: document.querySelector("#auto-robot-two"),
@@ -106,6 +116,8 @@ const els = {
   autoClear: document.querySelector("#auto-clear"),
   autoColor: document.querySelector("#auto-color"),
   autoSize: document.querySelector("#auto-size"),
+  autoSave: document.querySelector("#auto-save"),
+  autoSaveStatus: document.querySelector("#auto-save-status"),
   autoDownload: document.querySelector("#auto-download"),
   sidebarToggle: document.querySelector("#sidebar-toggle"),
   sidebarBackdrop: document.querySelector("#sidebar-backdrop"),
@@ -167,10 +179,26 @@ els.picksClose.addEventListener("click", closePicksMenu);
 els.picksBackdrop.addEventListener("click", closePicksMenu);
 els.autoOpen.addEventListener("click", (event) => {
   event.preventDefault();
-  openAutoMenu();
+  openAutoTeamMenu();
 });
 els.autoClose.addEventListener("click", closeAutoMenu);
-els.autoBackdrop.addEventListener("click", closeAutoMenu);
+els.autoChangeTeam.addEventListener("click", openAutoTeamMenu);
+els.autoBackdrop.addEventListener("click", () => {
+  if (!els.autoTeamMenu.hidden) {
+    closeAutoTeamMenu();
+    return;
+  }
+
+  closeAutoMenu();
+});
+els.autoTeamForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  startAutoForTypedTeam();
+});
+els.autoTeamTest.addEventListener("click", () => {
+  els.autoTeamInput.value = "Test Team";
+  startAutoForTypedTeam();
+});
 els.autoRobotOne.addEventListener("click", () => setAutoRobot("one"));
 els.autoRobotTwo.addEventListener("click", () => setAutoRobot("two"));
 els.autoDraw.addEventListener("click", () => setAutoTool("draw"));
@@ -179,6 +207,7 @@ els.autoPlay.addEventListener("click", playAutoPath);
 els.autoStop.addEventListener("click", stopAutoPath);
 els.autoUndo.addEventListener("click", undoAutoStroke);
 els.autoClear.addEventListener("click", clearAutoCanvas);
+els.autoSave.addEventListener("click", () => saveAutoDrawing());
 els.autoDownload.addEventListener("click", downloadAutoCanvas);
 els.autoCanvas.addEventListener("pointerdown", startAutoStroke);
 els.autoCanvas.addEventListener("pointermove", continueAutoStroke);
@@ -228,6 +257,7 @@ function openAutoMenu() {
   });
   closeSidebar();
   closePicksMenu();
+  closeAutoTeamMenu();
   document.body.classList.add("auto-open");
   els.autoMenu.hidden = false;
   els.autoMenu.removeAttribute("hidden");
@@ -236,11 +266,57 @@ function openAutoMenu() {
   renderAutoCanvas();
 }
 
+function openAutoTeamMenu() {
+  document.querySelectorAll(".sidebar-link").forEach((item) => {
+    item.classList.toggle("is-active", item === els.autoOpen);
+  });
+  closeSidebar();
+  closePicksMenu();
+  stopAutoPath();
+  document.body.classList.add("auto-open");
+  els.autoMenu.hidden = true;
+  els.autoTeamMenu.hidden = false;
+  els.autoTeamMenu.removeAttribute("hidden");
+  els.autoBackdrop.hidden = false;
+  els.autoBackdrop.removeAttribute("hidden");
+  els.autoTeamInput.value = state.autoTeamLabel;
+  els.autoTeamStatus.textContent = getAutoTeamPromptStatus();
+  setTimeout(() => els.autoTeamInput.focus(), 0);
+}
+
+function closeAutoTeamMenu() {
+  els.autoTeamMenu.hidden = true;
+  if (els.autoMenu.hidden) {
+    document.body.classList.remove("auto-open");
+    els.autoBackdrop.hidden = true;
+  }
+}
+
 function closeAutoMenu() {
+  endAutoStroke();
+  saveAutoDrawing({ silent: true });
   document.body.classList.remove("auto-open");
   els.autoMenu.hidden = true;
+  els.autoTeamMenu.hidden = true;
   els.autoBackdrop.hidden = true;
-  endAutoStroke();
+}
+
+function startAutoForTypedTeam() {
+  const label = els.autoTeamInput.value.trim();
+  const key = getAutoTeamKey(label);
+
+  if (!label) {
+    els.autoTeamStatus.textContent = "Type a team number or team name first.";
+    return;
+  }
+
+  if (!key) {
+    els.autoTeamStatus.textContent = "Use at least one letter or number for the team.";
+    return;
+  }
+
+  loadAutoDrawingForTeam(label);
+  openAutoMenu();
 }
 
 function setAutoTool(tool) {
@@ -288,6 +364,7 @@ function endAutoStroke() {
   }
   state.autoDrawing = false;
   state.autoCurrentStroke = null;
+  saveAutoDrawing({ silent: true });
   renderAutoCanvas();
 }
 
@@ -295,6 +372,7 @@ function undoAutoStroke() {
   stopAutoPath();
   state.autoStrokes.pop();
   resetAutoRobotDistances();
+  saveAutoDrawing({ silent: true });
   renderAutoCanvas();
 }
 
@@ -304,15 +382,82 @@ function clearAutoCanvas() {
   state.autoCurrentStroke = null;
   state.autoDrawing = false;
   resetAutoRobotDistances();
+  saveAutoDrawing({ silent: true });
   renderAutoCanvas();
 }
 
 function downloadAutoCanvas() {
   renderAutoCanvas();
   const link = document.createElement("a");
-  link.download = `matchcat-auto-${new Date().toISOString().slice(0, 10)}.png`;
+  const teamName = state.autoTeamKey || "team";
+  link.download = `matchcat-auto-${teamName}-${new Date().toISOString().slice(0, 10)}.png`;
   link.href = els.autoCanvas.toDataURL("image/png");
   link.click();
+}
+
+function getAutoStorage() {
+  try {
+    return JSON.parse(localStorage.getItem(AUTO_STORAGE_KEY)) || {};
+  } catch (error) {
+    return {};
+  }
+}
+
+function setAutoStorage(storage) {
+  localStorage.setItem(AUTO_STORAGE_KEY, JSON.stringify(storage));
+}
+
+function getAutoTeamKey(label) {
+  return label
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function getAutoTeamPromptStatus() {
+  const savedCount = Object.keys(getAutoStorage()).length;
+  return savedCount
+    ? `${savedCount} saved auto${savedCount === 1 ? "" : "s"} on this device.`
+    : "Saved drawings stay on this device.";
+}
+
+function loadAutoDrawingForTeam(label) {
+  const key = getAutoTeamKey(label);
+  const storage = getAutoStorage();
+  const savedAuto = storage[key];
+
+  state.autoTeamKey = key;
+  state.autoTeamLabel = savedAuto?.label || label.trim();
+  state.autoStrokes = Array.isArray(savedAuto?.strokes) ? savedAuto.strokes : [];
+  state.autoCurrentStroke = null;
+  state.autoDrawing = false;
+  resetAutoRobotDistances();
+  els.autoCurrentTeam.textContent = `Team: ${state.autoTeamLabel}`;
+  els.autoSaveStatus.textContent = savedAuto
+    ? `Loaded saved auto for ${state.autoTeamLabel}.`
+    : `New auto for ${state.autoTeamLabel}.`;
+}
+
+function saveAutoDrawing(options = {}) {
+  if (!state.autoTeamKey) {
+    if (!options.silent) {
+      els.autoSaveStatus.textContent = "Choose a team before saving.";
+    }
+    return;
+  }
+
+  const storage = getAutoStorage();
+  storage[state.autoTeamKey] = {
+    label: state.autoTeamLabel,
+    updatedAt: new Date().toISOString(),
+    strokes: state.autoStrokes,
+  };
+  setAutoStorage(storage);
+
+  if (!options.silent) {
+    els.autoSaveStatus.textContent = `Saved auto for ${state.autoTeamLabel}.`;
+  }
 }
 
 function getAutoCanvasPoint(event) {
