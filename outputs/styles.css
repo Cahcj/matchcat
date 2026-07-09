@@ -865,7 +865,7 @@ td {
 
 .team-detail__stats {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 12px;
 }
 
@@ -890,6 +890,12 @@ td {
 .team-detail__stats strong {
   font-size: clamp(1.05rem, 2vw, 1.45rem);
   line-height: 1.05;
+}
+
+.team-detail__stats small {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 900;
 }
 
 .team-auto-list {

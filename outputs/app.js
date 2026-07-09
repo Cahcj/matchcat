@@ -1155,17 +1155,21 @@ function renderSummary(allRows, visibleRows) {
 function renderClagueRating(rows) {
   const rating = getClagueRating(rows);
   const record = rating.record;
+  const scheduleStrength = getScheduleStrengthForRows(rows);
   const title = state.eventFilter === "all"
     ? `${getSeasonLabel(state.year)} overall`
     : eventDisplayName(state.eventFilter);
   const stars = record.played ? rating.stars : 0;
   const rate = record.played ? `${Math.round(record.winRate * 100)}% win rate` : "No played matches";
   const starText = starRating(stars) || "0 stars";
+  const scheduleText = scheduleStrength.matches
+    ? `Schedule strength ${scheduleStrength.score}/100 (${starRating(scheduleStrength.stars) || "0 stars"})`
+    : "Schedule strength --";
 
   els.clagueRating.innerHTML = `
     <span>Clague rating</span>
     <strong class="clague-rating__stars" aria-label="${stars} out of 5 stars">${starText}</strong>
-    <small>${escapeHtml(title)} / ${record.played ? `${record.wins}-${record.losses}-${record.ties}` : "0-0-0"} / ${rate} / ${escapeHtml(rating.source)}</small>
+    <small>${escapeHtml(title)} / ${record.played ? `${record.wins}-${record.losses}-${record.ties}` : "0-0-0"} / ${rate} / ${escapeHtml(scheduleText)} / ${escapeHtml(rating.source)}</small>
   `;
 }
 
@@ -1211,6 +1215,70 @@ function getTeamRecord(rows) {
   const winRate = played.length ? (wins + ties * 0.5) / played.length : 0;
 
   return { wins, losses, ties, played: played.length, winRate };
+}
+
+function getScheduleStrengthForRows(rows) {
+  const playedRows = rows.filter((row) => row.result === "Win" || row.result === "Loss" || row.result === "Tie");
+  const opponentStars = playedRows.flatMap((row) =>
+    row.opponents
+      .map((opponent) => opponent.stats?.stars)
+      .filter((stars) => Number.isFinite(stars)),
+  );
+
+  if (!opponentStars.length) {
+    return { score: "--", stars: 0, matches: 0, averageStars: null };
+  }
+
+  const averageStars = opponentStars.reduce((sum, stars) => sum + stars, 0) / opponentStars.length;
+  return {
+    score: Math.round((averageStars / 5) * 100),
+    stars: Math.round(averageStars),
+    matches: playedRows.length,
+    averageStars,
+  };
+}
+
+function getScheduleStrengthForTeam(teamNumber, preferredEventKey) {
+  const matches = [...state.details.values()].filter((match) => {
+    if (!isDetailInGameYear(match)) return false;
+    const key = detailEventKey(match);
+    if (preferredEventKey && key !== preferredEventKey) return false;
+
+    const redScore = match?.scores?.red?.totalPoints;
+    const blueScore = match?.scores?.blue?.totalPoints;
+    if (!Number.isFinite(redScore) || !Number.isFinite(blueScore)) return false;
+
+    return (match.teams ?? []).some((team) => team.teamNumber === teamNumber);
+  });
+  const opponentStars = [];
+
+  matches.forEach((match) => {
+    const key = detailEventKey(match);
+    const teamEntry = (match.teams ?? []).find((team) => team.teamNumber === teamNumber);
+    if (!teamEntry) return;
+
+    (match.teams ?? [])
+      .filter((team) => team.alliance !== teamEntry.alliance)
+      .forEach((opponent) => {
+        const stars = state.teamEventStats.get(teamStatsKey(key, opponent.teamNumber))?.stars
+          ?? state.eventTeamInsights.get(teamStatsKey(key, opponent.teamNumber))?.stars;
+        if (Number.isFinite(stars)) {
+          opponentStars.push(stars);
+        }
+      });
+  });
+
+  if (!opponentStars.length) {
+    return { score: "--", stars: 0, matches: matches.length, averageStars: null };
+  }
+
+  const averageStars = opponentStars.reduce((sum, stars) => sum + stars, 0) / opponentStars.length;
+  return {
+    score: Math.round((averageStars / 5) * 100),
+    stars: Math.round(averageStars),
+    matches: matches.length,
+    averageStars,
+  };
 }
 
 function renderMatches(rows) {
@@ -1478,6 +1546,13 @@ function renderTeamDetail() {
   const rows = getTeamEventHistory(teamNumber);
   const savedAutos = getAutosForTeam(teamNumber, teamName);
   const detailStars = stats?.stars ?? insight?.stars ?? 0;
+  const scheduleStrength = getScheduleStrengthForTeam(teamNumber, eventKeyForCard);
+  const scheduleLabel = scheduleStrength.matches
+    ? `${scheduleStrength.score}/100`
+    : "--";
+  const scheduleStars = scheduleStrength.matches
+    ? starRating(scheduleStrength.stars) || "0 stars"
+    : "No matches";
   const autoRows = savedAutos.length
     ? savedAutos.map((autoRecord) => `
         <article class="team-auto-card">
@@ -1535,6 +1610,11 @@ function renderTeamDetail() {
       <article>
         <span>Stars</span>
         <strong>${starRating(detailStars) || "0 stars"}</strong>
+      </article>
+      <article>
+        <span>Strength of Schedule</span>
+        <strong>${escapeHtml(scheduleLabel)}</strong>
+        <small>${escapeHtml(scheduleStars)}</small>
       </article>
     </div>
     <section class="team-auto-list" aria-label="Saved autonomous drawings">
