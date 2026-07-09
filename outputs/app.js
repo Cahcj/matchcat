@@ -1198,7 +1198,7 @@ function getClagueRating(rows) {
     record,
     stars: Math.round(ratingScore * 5),
     source: eventRatings.length
-      ? "80% non-penalty OPR, 15% auto OPR, 5% win-rate"
+      ? "65% non-penalty OPR, 15% rank, 15% auto OPR, 5% win-rate"
       : "Match record",
   };
 }
@@ -1676,7 +1676,8 @@ function buildEventTeamInsights() {
       const winRateScore = percentileScore(winRate, winRateValues);
       const partnerAdjustedWinRate = getPartnerAdjustedWinRate(key, teamNumber, winRate);
       const ratingScore = weightedRatingScore([
-        { value: oprScore, weight: 0.8 },
+        { value: oprScore, weight: 0.65 },
+        { value: rankScore, weight: 0.15 },
         { value: autoOprScore, weight: 0.15 },
         { value: winRateScore, weight: 0.05 },
       ]);
@@ -1698,7 +1699,7 @@ function buildEventTeamInsights() {
         partnerAdjustedWinRate,
         ratingScore,
         stars: Number.isFinite(ratingScore) ? Math.round(ratingScore * 5) : null,
-        source: "80% non-penalty OPR, 15% auto OPR, 5% win-rate percentiles",
+        source: "65% non-penalty OPR, 15% rank, 15% auto OPR, 5% win-rate percentiles",
       });
     });
   });
