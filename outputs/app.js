@@ -64,6 +64,7 @@ const state = {
   autoGameKey: "",
   autoGameLabel: "",
   autoAddedDate: "",
+  autoMotorRpm: "312rpm",
   selectedTeam: null,
 };
 
@@ -102,6 +103,7 @@ const els = {
   autoTeamInput: document.querySelector("#auto-team-input"),
   autoGameInput: document.querySelector("#auto-game-input"),
   autoDateInput: document.querySelector("#auto-date-input"),
+  autoRpmInput: document.querySelector("#auto-rpm-input"),
   autoTeamTest: document.querySelector("#auto-team-test"),
   autoTeamStatus: document.querySelector("#auto-team-status"),
   autoMenu: document.querySelector("#auto-menu"),
@@ -289,6 +291,7 @@ function openAutoTeamMenu() {
   renderAutoGameOptions();
   els.autoGameInput.value = state.autoGameKey || getDefaultAutoGameKey();
   els.autoDateInput.value = state.autoAddedDate || getTodayDateString();
+  els.autoRpmInput.value = state.autoMotorRpm || "312rpm";
   els.autoTeamStatus.textContent = getAutoTeamPromptStatus();
   setTimeout(() => els.autoTeamInput.focus(), 0);
 }
@@ -315,6 +318,7 @@ function startAutoForTypedTeam() {
   const key = getAutoTeamKey(label);
   const gameKey = els.autoGameInput.value || getDefaultAutoGameKey();
   const addedDate = els.autoDateInput.value || getTodayDateString();
+  const motorRpm = els.autoRpmInput.value || "312rpm";
 
   if (!label) {
     els.autoTeamStatus.textContent = "Type a team number or team name first.";
@@ -326,7 +330,7 @@ function startAutoForTypedTeam() {
     return;
   }
 
-  loadAutoDrawingForTeam(label, gameKey, addedDate);
+  loadAutoDrawingForTeam(label, gameKey, addedDate, motorRpm);
   openAutoMenu();
 }
 
@@ -486,6 +490,7 @@ function normalizeAutoTeamRecord(teamKey, record) {
           gameKey,
           gameLabel: getAutoGameLabel(gameKey),
           addedDate: record.addedDate || record.updatedAt?.slice(0, 10) || getTodayDateString(),
+          motorRpm: record.motorRpm || "312rpm",
           updatedAt: record.updatedAt || "",
           strokes: record.strokes,
         },
@@ -500,7 +505,12 @@ function normalizeAutoTeamRecord(teamKey, record) {
   };
 }
 
-function loadAutoDrawingForTeam(label, gameKey = getDefaultAutoGameKey(), addedDate = getTodayDateString()) {
+function loadAutoDrawingForTeam(
+  label,
+  gameKey = getDefaultAutoGameKey(),
+  addedDate = getTodayDateString(),
+  motorRpm = "312rpm",
+) {
   const key = getAutoTeamKey(label);
   const storage = getAutoStorage();
   const teamRecord = storage[key];
@@ -511,11 +521,12 @@ function loadAutoDrawingForTeam(label, gameKey = getDefaultAutoGameKey(), addedD
   state.autoGameKey = gameKey;
   state.autoGameLabel = savedAuto?.gameLabel || getAutoGameLabel(gameKey);
   state.autoAddedDate = savedAuto?.addedDate || addedDate;
+  state.autoMotorRpm = savedAuto?.motorRpm || motorRpm;
   state.autoStrokes = Array.isArray(savedAuto?.strokes) ? savedAuto.strokes : [];
   state.autoCurrentStroke = null;
   state.autoDrawing = false;
   resetAutoRobotDistances();
-  els.autoCurrentTeam.textContent = `Team: ${state.autoTeamLabel} | ${state.autoGameLabel} | ${state.autoAddedDate}`;
+  els.autoCurrentTeam.textContent = `Team: ${state.autoTeamLabel} | ${state.autoGameLabel} | ${state.autoAddedDate} | ${state.autoMotorRpm}`;
   els.autoSaveStatus.textContent = savedAuto
     ? `Loaded ${state.autoGameLabel} auto for ${state.autoTeamLabel}.`
     : `New ${state.autoGameLabel} auto for ${state.autoTeamLabel}.`;
@@ -542,6 +553,7 @@ function saveAutoDrawing(options = {}) {
     gameKey,
     gameLabel: state.autoGameLabel || getAutoGameLabel(gameKey),
     addedDate: state.autoAddedDate || getTodayDateString(),
+    motorRpm: state.autoMotorRpm || "312rpm",
     updatedAt: new Date().toISOString(),
     strokes: state.autoStrokes,
   };
@@ -588,12 +600,13 @@ function openSavedAuto(teamKey, gameKey) {
   state.autoGameKey = gameKey;
   state.autoGameLabel = autoRecord.gameLabel || getAutoGameLabel(gameKey);
   state.autoAddedDate = autoRecord.addedDate || getTodayDateString();
+  state.autoMotorRpm = autoRecord.motorRpm || "312rpm";
   state.autoStrokes = Array.isArray(autoRecord.strokes) ? autoRecord.strokes : [];
   state.autoCurrentStroke = null;
   state.autoDrawing = false;
   resetAutoRobotDistances();
   openAutoMenu();
-  els.autoCurrentTeam.textContent = `Team: ${state.autoTeamLabel} | ${state.autoGameLabel} | ${state.autoAddedDate}`;
+  els.autoCurrentTeam.textContent = `Team: ${state.autoTeamLabel} | ${state.autoGameLabel} | ${state.autoAddedDate} | ${state.autoMotorRpm}`;
   els.autoSaveStatus.textContent = `Viewing saved ${state.autoGameLabel} auto for ${state.autoTeamLabel}.`;
 }
 
@@ -1556,7 +1569,7 @@ function renderTeamDetail() {
           <div>
             <span>${escapeHtml(autoRecord.gameLabel || getAutoGameLabel(autoRecord.gameKey))}</span>
             <strong>${escapeHtml(autoRecord.addedDate || "No date")}</strong>
-            <small>${escapeHtml(autoRecord.label)} auto</small>
+            <small>${escapeHtml(autoRecord.label)} auto${autoRecord.motorRpm ? ` / ${escapeHtml(autoRecord.motorRpm)}` : ""}</small>
           </div>
           <div class="team-auto-card__actions">
             <button class="button button--small auto-view-button" type="button" data-team-key="${escapeHtml(autoRecord.teamKey)}" data-game-key="${escapeHtml(autoRecord.gameKey)}">View Auto</button>
