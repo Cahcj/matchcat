@@ -165,7 +165,8 @@ main {
   font-weight: 850;
 }
 
-.auto-team-card input {
+.auto-team-card input,
+.auto-team-card select {
   width: 100%;
   min-height: 46px;
   border: 1px solid var(--line);
@@ -177,7 +178,8 @@ main {
   padding: 0 12px;
 }
 
-.auto-team-card input:focus {
+.auto-team-card input:focus,
+.auto-team-card select:focus {
   border-color: rgba(25, 195, 125, 0.56);
   outline: none;
 }
@@ -890,6 +892,60 @@ td {
   line-height: 1.05;
 }
 
+.team-auto-list {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.025);
+  padding: 14px;
+}
+
+.team-auto-list__header,
+.team-auto-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.team-auto-list__header h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.team-auto-list__header span,
+.team-auto-card span,
+.team-auto-card small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.team-auto-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel-soft);
+  padding: 12px;
+}
+
+.team-auto-card div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.team-auto-card strong {
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+.team-auto-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 .team-detail__table-wrap {
   overflow-x: auto;
 }
@@ -1098,6 +1154,21 @@ td {
   .upcoming-match,
   .team-detail__stats {
     grid-template-columns: 1fr;
+  }
+
+  .team-auto-list__header,
+  .team-auto-card {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .team-auto-card__actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .team-auto-card__actions .button {
+    flex: 1 1 130px;
   }
 
   .upcoming-card {

@@ -61,6 +61,9 @@ const state = {
   autoRobotLastTime: 0,
   autoTeamKey: "",
   autoTeamLabel: "",
+  autoGameKey: "",
+  autoGameLabel: "",
+  autoAddedDate: "",
   selectedTeam: null,
 };
 
@@ -97,6 +100,8 @@ const els = {
   autoTeamMenu: document.querySelector("#auto-team-menu"),
   autoTeamForm: document.querySelector("#auto-team-form"),
   autoTeamInput: document.querySelector("#auto-team-input"),
+  autoGameInput: document.querySelector("#auto-game-input"),
+  autoDateInput: document.querySelector("#auto-date-input"),
   autoTeamTest: document.querySelector("#auto-team-test"),
   autoTeamStatus: document.querySelector("#auto-team-status"),
   autoMenu: document.querySelector("#auto-menu"),
@@ -261,6 +266,7 @@ function openAutoMenu() {
   document.body.classList.add("auto-open");
   els.autoMenu.hidden = false;
   els.autoMenu.removeAttribute("hidden");
+  els.autoTeamMenu.hidden = true;
   els.autoBackdrop.hidden = false;
   els.autoBackdrop.removeAttribute("hidden");
   renderAutoCanvas();
@@ -280,6 +286,9 @@ function openAutoTeamMenu() {
   els.autoBackdrop.hidden = false;
   els.autoBackdrop.removeAttribute("hidden");
   els.autoTeamInput.value = state.autoTeamLabel;
+  renderAutoGameOptions();
+  els.autoGameInput.value = state.autoGameKey || getDefaultAutoGameKey();
+  els.autoDateInput.value = state.autoAddedDate || getTodayDateString();
   els.autoTeamStatus.textContent = getAutoTeamPromptStatus();
   setTimeout(() => els.autoTeamInput.focus(), 0);
 }
@@ -304,6 +313,8 @@ function closeAutoMenu() {
 function startAutoForTypedTeam() {
   const label = els.autoTeamInput.value.trim();
   const key = getAutoTeamKey(label);
+  const gameKey = els.autoGameInput.value || getDefaultAutoGameKey();
+  const addedDate = els.autoDateInput.value || getTodayDateString();
 
   if (!label) {
     els.autoTeamStatus.textContent = "Type a team number or team name first.";
@@ -315,7 +326,7 @@ function startAutoForTypedTeam() {
     return;
   }
 
-  loadAutoDrawingForTeam(label);
+  loadAutoDrawingForTeam(label, gameKey, addedDate);
   openAutoMenu();
 }
 
@@ -397,7 +408,14 @@ function downloadAutoCanvas() {
 
 function getAutoStorage() {
   try {
-    return JSON.parse(localStorage.getItem(AUTO_STORAGE_KEY)) || {};
+    const rawStorage = JSON.parse(localStorage.getItem(AUTO_STORAGE_KEY)) || {};
+    const storage = {};
+
+    Object.entries(rawStorage).forEach(([teamKey, value]) => {
+      storage[teamKey] = normalizeAutoTeamRecord(teamKey, value);
+    });
+
+    return storage;
   } catch (error) {
     return {};
   }
@@ -416,27 +434,91 @@ function getAutoTeamKey(label) {
 }
 
 function getAutoTeamPromptStatus() {
-  const savedCount = Object.keys(getAutoStorage()).length;
+  const savedCount = Object.values(getAutoStorage()).reduce(
+    (total, teamRecord) => total + Object.keys(teamRecord.autos || {}).length,
+    0,
+  );
   return savedCount
     ? `${savedCount} saved auto${savedCount === 1 ? "" : "s"} on this device.`
     : "Saved drawings stay on this device.";
 }
 
-function loadAutoDrawingForTeam(label) {
+function renderAutoGameOptions() {
+  els.autoGameInput.innerHTML = Object.entries(GAME_SEASONS)
+    .sort((a, b) => Number(b[0]) - Number(a[0]))
+    .map(([year, seasonLabel]) => {
+      const selected = String(year) === String(state.year) ? " selected" : "";
+      return `<option value="${year}"${selected}>${escapeHtml(seasonLabel)}</option>`;
+    })
+    .join("");
+}
+
+function getDefaultAutoGameKey() {
+  return String(state.year);
+}
+
+function getAutoGameLabel(gameKey) {
+  return GAME_SEASONS[Number(gameKey)] || gameKey || getSeasonLabel(state.year);
+}
+
+function getTodayDateString() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function normalizeAutoTeamRecord(teamKey, record) {
+  const fallbackLabel = record?.label || teamKey;
+
+  if (record?.autos && typeof record.autos === "object") {
+    return {
+      label: fallbackLabel,
+      updatedAt: record.updatedAt || "",
+      autos: record.autos,
+    };
+  }
+
+  if (Array.isArray(record?.strokes)) {
+    const gameKey = getDefaultAutoGameKey();
+    return {
+      label: fallbackLabel,
+      updatedAt: record.updatedAt || "",
+      autos: {
+        [gameKey]: {
+          gameKey,
+          gameLabel: getAutoGameLabel(gameKey),
+          addedDate: record.addedDate || record.updatedAt?.slice(0, 10) || getTodayDateString(),
+          updatedAt: record.updatedAt || "",
+          strokes: record.strokes,
+        },
+      },
+    };
+  }
+
+  return {
+    label: fallbackLabel,
+    updatedAt: "",
+    autos: {},
+  };
+}
+
+function loadAutoDrawingForTeam(label, gameKey = getDefaultAutoGameKey(), addedDate = getTodayDateString()) {
   const key = getAutoTeamKey(label);
   const storage = getAutoStorage();
-  const savedAuto = storage[key];
+  const teamRecord = storage[key];
+  const savedAuto = teamRecord?.autos?.[gameKey];
 
   state.autoTeamKey = key;
-  state.autoTeamLabel = savedAuto?.label || label.trim();
+  state.autoTeamLabel = teamRecord?.label || label.trim();
+  state.autoGameKey = gameKey;
+  state.autoGameLabel = savedAuto?.gameLabel || getAutoGameLabel(gameKey);
+  state.autoAddedDate = savedAuto?.addedDate || addedDate;
   state.autoStrokes = Array.isArray(savedAuto?.strokes) ? savedAuto.strokes : [];
   state.autoCurrentStroke = null;
   state.autoDrawing = false;
   resetAutoRobotDistances();
-  els.autoCurrentTeam.textContent = `Team: ${state.autoTeamLabel}`;
+  els.autoCurrentTeam.textContent = `Team: ${state.autoTeamLabel} | ${state.autoGameLabel} | ${state.autoAddedDate}`;
   els.autoSaveStatus.textContent = savedAuto
-    ? `Loaded saved auto for ${state.autoTeamLabel}.`
-    : `New auto for ${state.autoTeamLabel}.`;
+    ? `Loaded ${state.autoGameLabel} auto for ${state.autoTeamLabel}.`
+    : `New ${state.autoGameLabel} auto for ${state.autoTeamLabel}.`;
 }
 
 function saveAutoDrawing(options = {}) {
@@ -448,16 +530,94 @@ function saveAutoDrawing(options = {}) {
   }
 
   const storage = getAutoStorage();
-  storage[state.autoTeamKey] = {
+  const gameKey = state.autoGameKey || getDefaultAutoGameKey();
+  storage[state.autoTeamKey] = storage[state.autoTeamKey] || {
     label: state.autoTeamLabel,
+    updatedAt: "",
+    autos: {},
+  };
+  storage[state.autoTeamKey].label = state.autoTeamLabel;
+  storage[state.autoTeamKey].updatedAt = new Date().toISOString();
+  storage[state.autoTeamKey].autos[gameKey] = {
+    gameKey,
+    gameLabel: state.autoGameLabel || getAutoGameLabel(gameKey),
+    addedDate: state.autoAddedDate || getTodayDateString(),
     updatedAt: new Date().toISOString(),
     strokes: state.autoStrokes,
   };
   setAutoStorage(storage);
 
   if (!options.silent) {
-    els.autoSaveStatus.textContent = `Saved auto for ${state.autoTeamLabel}.`;
+    els.autoSaveStatus.textContent = `Saved ${storage[state.autoTeamKey].autos[gameKey].gameLabel} auto for ${state.autoTeamLabel}.`;
   }
+}
+
+function getAutosForTeam(teamNumber, teamName) {
+  const storage = getAutoStorage();
+  const possibleKeys = [
+    getAutoTeamKey(String(teamNumber)),
+    getAutoTeamKey(teamName),
+  ].filter(Boolean);
+  const autos = [];
+
+  possibleKeys.forEach((teamKey) => {
+    const teamRecord = storage[teamKey];
+    if (!teamRecord?.autos) return;
+
+    Object.values(teamRecord.autos).forEach((autoRecord) => {
+      autos.push({
+        teamKey,
+        label: teamRecord.label,
+        ...autoRecord,
+      });
+    });
+  });
+
+  return autos.sort((a, b) => String(b.addedDate || "").localeCompare(String(a.addedDate || "")));
+}
+
+function openSavedAuto(teamKey, gameKey) {
+  const storage = getAutoStorage();
+  const teamRecord = storage[teamKey];
+  const autoRecord = teamRecord?.autos?.[gameKey];
+
+  if (!teamRecord || !autoRecord) return;
+
+  state.autoTeamKey = teamKey;
+  state.autoTeamLabel = teamRecord.label;
+  state.autoGameKey = gameKey;
+  state.autoGameLabel = autoRecord.gameLabel || getAutoGameLabel(gameKey);
+  state.autoAddedDate = autoRecord.addedDate || getTodayDateString();
+  state.autoStrokes = Array.isArray(autoRecord.strokes) ? autoRecord.strokes : [];
+  state.autoCurrentStroke = null;
+  state.autoDrawing = false;
+  resetAutoRobotDistances();
+  openAutoMenu();
+  els.autoCurrentTeam.textContent = `Team: ${state.autoTeamLabel} | ${state.autoGameLabel} | ${state.autoAddedDate}`;
+  els.autoSaveStatus.textContent = `Viewing saved ${state.autoGameLabel} auto for ${state.autoTeamLabel}.`;
+}
+
+function deleteSavedAuto(teamKey, gameKey) {
+  const storage = getAutoStorage();
+  if (!storage[teamKey]?.autos?.[gameKey]) return;
+
+  delete storage[teamKey].autos[gameKey];
+  storage[teamKey].updatedAt = new Date().toISOString();
+
+  if (!Object.keys(storage[teamKey].autos).length) {
+    delete storage[teamKey];
+  }
+
+  setAutoStorage(storage);
+
+  if (state.autoTeamKey === teamKey && state.autoGameKey === gameKey) {
+    state.autoStrokes = [];
+    state.autoCurrentStroke = null;
+    resetAutoRobotDistances();
+    renderAutoCanvas();
+  }
+
+  renderTeamDetail();
 }
 
 function getAutoCanvasPoint(event) {
@@ -704,6 +864,18 @@ function drawAutoRobot(ctx, robotId) {
 }
 
 document.addEventListener("click", (event) => {
+  const viewAutoButton = event.target.closest(".auto-view-button");
+  if (viewAutoButton) {
+    openSavedAuto(viewAutoButton.dataset.teamKey, viewAutoButton.dataset.gameKey);
+    return;
+  }
+
+  const deleteAutoButton = event.target.closest(".auto-delete-button");
+  if (deleteAutoButton) {
+    deleteSavedAuto(deleteAutoButton.dataset.teamKey, deleteAutoButton.dataset.gameKey);
+    return;
+  }
+
   const teamButton = event.target.closest(".team-link");
   if (!teamButton) return;
 
@@ -1304,7 +1476,23 @@ function renderTeamDetail() {
   const insight = state.eventTeamInsights.get(teamStatsKey(eventKeyForCard, teamNumber));
   const stats = state.teamEventStats.get(teamStatsKey(eventKeyForCard, teamNumber));
   const rows = getTeamEventHistory(teamNumber);
+  const savedAutos = getAutosForTeam(teamNumber, teamName);
   const detailStars = stats?.stars ?? insight?.stars ?? 0;
+  const autoRows = savedAutos.length
+    ? savedAutos.map((autoRecord) => `
+        <article class="team-auto-card">
+          <div>
+            <span>${escapeHtml(autoRecord.gameLabel || getAutoGameLabel(autoRecord.gameKey))}</span>
+            <strong>${escapeHtml(autoRecord.addedDate || "No date")}</strong>
+            <small>${escapeHtml(autoRecord.label)} auto</small>
+          </div>
+          <div class="team-auto-card__actions">
+            <button class="button button--small auto-view-button" type="button" data-team-key="${escapeHtml(autoRecord.teamKey)}" data-game-key="${escapeHtml(autoRecord.gameKey)}">View Auto</button>
+            <button class="button button--dark button--small auto-delete-button" type="button" data-team-key="${escapeHtml(autoRecord.teamKey)}" data-game-key="${escapeHtml(autoRecord.gameKey)}">Delete Auto</button>
+          </div>
+        </article>
+      `).join("")
+    : `<div class="empty">No saved autos for this team yet.</div>`;
   const rankRows = rows.length
     ? rows.map((row) => `
         <tr>
@@ -1349,6 +1537,13 @@ function renderTeamDetail() {
         <strong>${starRating(detailStars) || "0 stars"}</strong>
       </article>
     </div>
+    <section class="team-auto-list" aria-label="Saved autonomous drawings">
+      <div class="team-auto-list__header">
+        <h3>Saved Autos</h3>
+        <span>${savedAutos.length} saved</span>
+      </div>
+      ${autoRows}
+    </section>
     <div class="team-detail__table-wrap">
       <table class="team-detail__table">
         <thead>
