@@ -1,5 +1,8 @@
 const API_ROOT = "https://api.ftcscout.org/rest/v1";
 const TEAM_NUMBER = 7305;
+const AUTO_FIELD_IMAGE_SRC = "auto-field.png";
+const AUTO_ROBOT_SIZE = 78;
+const AUTO_ROBOT_SPEED = 430;
 const GAME_SEASONS = {
   2013: "2012-2013 Ring It Up!",
   2014: "2013-2014 Block Party!",
@@ -37,8 +40,18 @@ const state = {
   autoDrawing: false,
   autoStrokes: [],
   autoCurrentStroke: null,
+  autoRobotPlaying: false,
+  autoRobotDistance: 0,
+  autoRobotFrame: null,
+  autoRobotLastTime: 0,
   selectedTeam: null,
 };
+
+const autoFieldImage = new Image();
+autoFieldImage.src = AUTO_FIELD_IMAGE_SRC;
+autoFieldImage.addEventListener("load", () => {
+  renderAutoCanvas();
+});
 
 const els = {
   form: document.querySelector("#tracker-form"),
@@ -71,6 +84,8 @@ const els = {
   autoCanvas: document.querySelector("#auto-canvas"),
   autoDraw: document.querySelector("#auto-draw"),
   autoErase: document.querySelector("#auto-erase"),
+  autoPlay: document.querySelector("#auto-play"),
+  autoStop: document.querySelector("#auto-stop"),
   autoUndo: document.querySelector("#auto-undo"),
   autoClear: document.querySelector("#auto-clear"),
   autoColor: document.querySelector("#auto-color"),
@@ -142,6 +157,8 @@ els.autoClose.addEventListener("click", closeAutoMenu);
 els.autoBackdrop.addEventListener("click", closeAutoMenu);
 els.autoDraw.addEventListener("click", () => setAutoTool("draw"));
 els.autoErase.addEventListener("click", () => setAutoTool("erase"));
+els.autoPlay.addEventListener("click", playAutoPath);
+els.autoStop.addEventListener("click", stopAutoPath);
 els.autoUndo.addEventListener("click", undoAutoStroke);
 els.autoClear.addEventListener("click", clearAutoCanvas);
 els.autoDownload.addEventListener("click", downloadAutoCanvas);
@@ -216,6 +233,7 @@ function setAutoTool(tool) {
 
 function startAutoStroke(event) {
   event.preventDefault();
+  stopAutoPath();
   const point = getAutoCanvasPoint(event);
   state.autoDrawing = true;
   state.autoCurrentStroke = {
@@ -248,14 +266,18 @@ function endAutoStroke() {
 }
 
 function undoAutoStroke() {
+  stopAutoPath();
   state.autoStrokes.pop();
+  state.autoRobotDistance = 0;
   renderAutoCanvas();
 }
 
 function clearAutoCanvas() {
+  stopAutoPath();
   state.autoStrokes = [];
   state.autoCurrentStroke = null;
   state.autoDrawing = false;
+  state.autoRobotDistance = 0;
   renderAutoCanvas();
 }
 
@@ -286,10 +308,17 @@ function renderAutoCanvas() {
   [...state.autoStrokes, state.autoCurrentStroke].filter(Boolean).forEach((stroke) => {
     drawAutoStroke(ctx, stroke);
   });
+  drawAutoRobot(ctx);
 }
 
 function drawAutoField(ctx, width, height) {
   ctx.clearRect(0, 0, width, height);
+
+  if (autoFieldImage.complete && autoFieldImage.naturalWidth > 0) {
+    ctx.drawImage(autoFieldImage, 0, 0, width, height);
+    return;
+  }
+
   ctx.fillStyle = "#101011";
   ctx.fillRect(0, 0, width, height);
 
@@ -340,6 +369,141 @@ function drawAutoStroke(ctx, stroke) {
   ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
   stroke.points.slice(1).forEach((point) => ctx.lineTo(point.x, point.y));
   ctx.stroke();
+  ctx.restore();
+}
+
+function playAutoPath() {
+  const pathLength = getAutoPathLength();
+
+  if (pathLength <= 0) {
+    return;
+  }
+
+  stopAutoPath();
+  state.autoRobotPlaying = true;
+  state.autoRobotDistance = 0;
+  state.autoRobotLastTime = 0;
+  els.autoPlay.classList.add("is-active");
+  state.autoRobotFrame = requestAnimationFrame(stepAutoRobot);
+}
+
+function stopAutoPath() {
+  if (state.autoRobotFrame) {
+    cancelAnimationFrame(state.autoRobotFrame);
+  }
+
+  state.autoRobotPlaying = false;
+  state.autoRobotFrame = null;
+  state.autoRobotLastTime = 0;
+  els.autoPlay.classList.remove("is-active");
+}
+
+function stepAutoRobot(timestamp) {
+  if (!state.autoRobotPlaying) {
+    return;
+  }
+
+  if (!state.autoRobotLastTime) {
+    state.autoRobotLastTime = timestamp;
+  }
+
+  const elapsedSeconds = (timestamp - state.autoRobotLastTime) / 1000;
+  state.autoRobotLastTime = timestamp;
+  const pathLength = getAutoPathLength();
+  state.autoRobotDistance += AUTO_ROBOT_SPEED * elapsedSeconds;
+
+  if (state.autoRobotDistance >= pathLength) {
+    state.autoRobotDistance = pathLength;
+    state.autoRobotPlaying = false;
+    state.autoRobotFrame = null;
+    state.autoRobotLastTime = 0;
+    els.autoPlay.classList.remove("is-active");
+    renderAutoCanvas();
+    return;
+  }
+
+  renderAutoCanvas();
+  state.autoRobotFrame = requestAnimationFrame(stepAutoRobot);
+}
+
+function getAutoPathSegments() {
+  const strokes = [...state.autoStrokes, state.autoCurrentStroke].filter(
+    (stroke) => stroke && stroke.tool === "draw" && stroke.points.length > 1,
+  );
+  const segments = [];
+
+  strokes.forEach((stroke) => {
+    for (let index = 1; index < stroke.points.length; index += 1) {
+      const from = stroke.points[index - 1];
+      const to = stroke.points[index];
+      const length = Math.hypot(to.x - from.x, to.y - from.y);
+
+      if (length > 0) {
+        segments.push({ from, to, length });
+      }
+    }
+  });
+
+  return segments;
+}
+
+function getAutoPathLength() {
+  return getAutoPathSegments().reduce((total, segment) => total + segment.length, 0);
+}
+
+function getAutoRobotPose() {
+  const segments = getAutoPathSegments();
+
+  if (!segments.length) {
+    return null;
+  }
+
+  let remainingDistance = Math.min(state.autoRobotDistance, getAutoPathLength());
+
+  for (const segment of segments) {
+    if (remainingDistance <= segment.length) {
+      const progress = segment.length ? remainingDistance / segment.length : 0;
+      return {
+        x: segment.from.x + (segment.to.x - segment.from.x) * progress,
+        y: segment.from.y + (segment.to.y - segment.from.y) * progress,
+        angle: Math.atan2(segment.to.y - segment.from.y, segment.to.x - segment.from.x),
+      };
+    }
+
+    remainingDistance -= segment.length;
+  }
+
+  const lastSegment = segments[segments.length - 1];
+  return {
+    x: lastSegment.to.x,
+    y: lastSegment.to.y,
+    angle: Math.atan2(lastSegment.to.y - lastSegment.from.y, lastSegment.to.x - lastSegment.from.x),
+  };
+}
+
+function drawAutoRobot(ctx) {
+  const pose = getAutoRobotPose();
+
+  if (!pose) {
+    return;
+  }
+
+  ctx.save();
+  ctx.translate(pose.x, pose.y);
+  ctx.rotate(pose.angle);
+  ctx.shadowColor = "rgba(0, 0, 0, 0.55)";
+  ctx.shadowBlur = 24;
+  ctx.fillStyle = "rgba(25, 195, 125, 0.94)";
+  ctx.strokeStyle = "#f6f7fb";
+  ctx.lineWidth = 7;
+  ctx.fillRect(-AUTO_ROBOT_SIZE / 2, -AUTO_ROBOT_SIZE / 2, AUTO_ROBOT_SIZE, AUTO_ROBOT_SIZE);
+  ctx.strokeRect(-AUTO_ROBOT_SIZE / 2, -AUTO_ROBOT_SIZE / 2, AUTO_ROBOT_SIZE, AUTO_ROBOT_SIZE);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = "#06130d";
+  ctx.font = "900 22px Inter, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("7305", 0, 0);
   ctx.restore();
 }
 
