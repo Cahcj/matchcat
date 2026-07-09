@@ -940,8 +940,18 @@ td {
     transition: transform 180ms ease;
   }
 
-  .sidebar-open .app-sidebar {
-    transform: translateX(0);
+  body.sidebar-open .app-sidebar {
+    transform: translateX(0) !important;
+  }
+
+  body.auto-open .auto-menu,
+  body.picks-open .picks-menu {
+    display: grid;
+  }
+
+  body.auto-open .auto-backdrop,
+  body.picks-open .picks-backdrop {
+    display: block;
   }
 
   .sidebar-backdrop {

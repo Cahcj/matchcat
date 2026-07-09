@@ -128,10 +128,16 @@ els.sidebarToggle.addEventListener("click", () => {
 });
 
 els.sidebarBackdrop.addEventListener("click", closeSidebar);
-els.picksOpen.addEventListener("click", openPicksMenu);
+els.picksOpen.addEventListener("click", (event) => {
+  event.preventDefault();
+  openPicksMenu();
+});
 els.picksClose.addEventListener("click", closePicksMenu);
 els.picksBackdrop.addEventListener("click", closePicksMenu);
-els.autoOpen.addEventListener("click", openAutoMenu);
+els.autoOpen.addEventListener("click", (event) => {
+  event.preventDefault();
+  openAutoMenu();
+});
 els.autoClose.addEventListener("click", closeAutoMenu);
 els.autoBackdrop.addEventListener("click", closeAutoMenu);
 els.autoDraw.addEventListener("click", () => setAutoTool("draw"));
@@ -170,7 +176,9 @@ function openPicksMenu() {
   closeAutoMenu();
   document.body.classList.add("picks-open");
   els.picksMenu.hidden = false;
+  els.picksMenu.removeAttribute("hidden");
   els.picksBackdrop.hidden = false;
+  els.picksBackdrop.removeAttribute("hidden");
 }
 
 function closePicksMenu() {
@@ -187,7 +195,9 @@ function openAutoMenu() {
   closePicksMenu();
   document.body.classList.add("auto-open");
   els.autoMenu.hidden = false;
+  els.autoMenu.removeAttribute("hidden");
   els.autoBackdrop.hidden = false;
+  els.autoBackdrop.removeAttribute("hidden");
   renderAutoCanvas();
 }
 
