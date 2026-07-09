@@ -54,6 +54,10 @@ const els = {
   matchBody: document.querySelector("#match-body"),
   picksList: document.querySelector("#picks-list"),
   picksStatus: document.querySelector("#picks-status"),
+  picksMenu: document.querySelector("#picks-menu"),
+  picksOpen: document.querySelector("#picks-open"),
+  picksClose: document.querySelector("#picks-close"),
+  picksBackdrop: document.querySelector("#picks-backdrop"),
   sidebarToggle: document.querySelector("#sidebar-toggle"),
   sidebarBackdrop: document.querySelector("#sidebar-backdrop"),
   teamDetailPanel: document.querySelector("#team-detail-panel"),
@@ -101,12 +105,16 @@ els.sidebarToggle.addEventListener("click", () => {
 });
 
 els.sidebarBackdrop.addEventListener("click", closeSidebar);
+els.picksOpen.addEventListener("click", openPicksMenu);
+els.picksClose.addEventListener("click", closePicksMenu);
+els.picksBackdrop.addEventListener("click", closePicksMenu);
 
-document.querySelectorAll(".sidebar-link").forEach((link) => {
+document.querySelectorAll(".sidebar-link[href]").forEach((link) => {
   link.addEventListener("click", () => {
     document.querySelectorAll(".sidebar-link").forEach((item) => {
       item.classList.toggle("is-active", item === link);
     });
+    closePicksMenu();
     closeSidebar();
   });
 });
@@ -117,10 +125,27 @@ function closeSidebar() {
   els.sidebarBackdrop.hidden = true;
 }
 
+function openPicksMenu() {
+  document.querySelectorAll(".sidebar-link").forEach((item) => {
+    item.classList.toggle("is-active", item === els.picksOpen);
+  });
+  closeSidebar();
+  document.body.classList.add("picks-open");
+  els.picksMenu.hidden = false;
+  els.picksBackdrop.hidden = false;
+}
+
+function closePicksMenu() {
+  document.body.classList.remove("picks-open");
+  els.picksMenu.hidden = true;
+  els.picksBackdrop.hidden = true;
+}
+
 document.addEventListener("click", (event) => {
   const teamButton = event.target.closest(".team-link");
   if (!teamButton) return;
 
+  closePicksMenu();
   openTeamDetail(Number(teamButton.dataset.teamNumber), teamButton.dataset.eventKey);
 });
 

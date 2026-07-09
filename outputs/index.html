@@ -23,11 +23,25 @@
       </div>
       <nav class="app-sidebar__nav">
         <a href="#page-title" class="sidebar-link is-active">Dashboard</a>
-        <a href="#picks" class="sidebar-link">Picks</a>
+        <button class="sidebar-link" id="picks-open" type="button">Picks</button>
         <a href="#matches" class="sidebar-link">Past Matches</a>
       </nav>
     </aside>
     <div class="sidebar-backdrop" id="sidebar-backdrop" hidden></div>
+    <div class="picks-backdrop" id="picks-backdrop" hidden></div>
+    <section class="picks-menu" id="picks-menu" aria-labelledby="picks-title" hidden>
+      <div class="picks-menu__header">
+        <div>
+          <p class="section-kicker">Alliance Captain</p>
+          <h2 id="picks-title">Picks</h2>
+        </div>
+        <button class="button button--dark button--small" id="picks-close" type="button">Close</button>
+      </div>
+      <div class="status picks-menu__status" id="picks-status">Ranking teams from FTCScout data...</div>
+      <div class="picks-list" id="picks-list">
+        <div class="empty">Loading pick list...</div>
+      </div>
+    </section>
 
     <main>
       <section class="hero" aria-labelledby="page-title">
@@ -114,19 +128,6 @@
             <button class="button button--dark button--small" id="team-detail-close" type="button">Close</button>
           </div>
           <div class="team-detail" id="team-detail-body"></div>
-        </section>
-
-        <section class="panel picks-panel" id="picks">
-          <div class="panel__header">
-            <div>
-              <p class="section-kicker">Alliance Captain</p>
-              <h2>Picks</h2>
-            </div>
-            <div class="status" id="picks-status">Ranking teams from FTCScout data...</div>
-          </div>
-          <div class="picks-list" id="picks-list">
-            <div class="empty">Loading pick list...</div>
-          </div>
         </section>
 
         <section class="panel" id="matches">
