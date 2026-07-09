@@ -570,7 +570,7 @@ function downloadAutoCanvas() {
   renderAutoCanvas();
   const link = document.createElement("a");
   const teamName = state.autoTeamKey || "team";
-  link.download = `matchcat-auto-${teamName}-${new Date().toISOString().slice(0, 10)}.png`;
+  link.download = `matchcat-scoutingform-${teamName}-${new Date().toISOString().slice(0, 10)}.png`;
   link.href = els.autoCanvas.toDataURL("image/png");
   link.click();
 }
@@ -608,7 +608,7 @@ function getAutoTeamPromptStatus() {
     0,
   );
   return savedCount
-    ? `${savedCount} saved auto${savedCount === 1 ? "" : "s"} on this device.`
+    ? `${savedCount} saved ScoutingForm${savedCount === 1 ? "" : "s"} on this device.`
     : "Saved drawings stay on this device.";
 }
 
@@ -705,8 +705,8 @@ function loadAutoDrawingForTeam(
   resetAutoRobotDistances();
   updateAutoHeader();
   els.autoSaveStatus.textContent = savedAuto
-    ? `Loaded ${state.autoGameLabel} auto for ${state.autoTeamLabel}.`
-    : `New ${state.autoGameLabel} auto for ${state.autoTeamLabel}.`;
+    ? `Loaded ${state.autoGameLabel} ScoutingForm for ${state.autoTeamLabel}.`
+    : `New ${state.autoGameLabel} ScoutingForm for ${state.autoTeamLabel}.`;
 }
 
 function saveAutoDrawing(options = {}) {
@@ -738,7 +738,7 @@ function saveAutoDrawing(options = {}) {
   setAutoStorage(storage);
 
   if (!options.silent) {
-    els.autoSaveStatus.textContent = `Saved ${storage[state.autoTeamKey].autos[gameKey].gameLabel} auto for ${state.autoTeamLabel}.`;
+    els.autoSaveStatus.textContent = `Saved ${storage[state.autoTeamKey].autos[gameKey].gameLabel} ScoutingForm for ${state.autoTeamLabel}.`;
   }
 }
 
@@ -786,7 +786,7 @@ function openSavedAuto(teamKey, gameKey) {
   resetAutoRobotDistances();
   openAutoMenu();
   updateAutoHeader();
-  els.autoSaveStatus.textContent = `Viewing saved ${state.autoGameLabel} auto for ${state.autoTeamLabel}.`;
+  els.autoSaveStatus.textContent = `Viewing saved ${state.autoGameLabel} ScoutingForm for ${state.autoTeamLabel}.`;
 }
 
 function deleteSavedAuto(teamKey, gameKey) {
@@ -1953,15 +1953,15 @@ function renderTeamDetail() {
           <div>
             <span>${escapeHtml(autoRecord.gameLabel || getAutoGameLabel(autoRecord.gameKey))}</span>
             <strong>${escapeHtml(autoRecord.addedDate || "No date")}</strong>
-            <small>${escapeHtml(autoRecord.label)} auto${autoRecord.motorRpm ? ` / ${escapeHtml(autoRecord.motorRpm)}` : ""}</small>
+            <small>${escapeHtml(autoRecord.label)} ScoutingForm${autoRecord.motorRpm ? ` / ${escapeHtml(autoRecord.motorRpm)}` : ""}</small>
           </div>
           <div class="team-auto-card__actions">
-            <button class="button button--small auto-view-button" type="button" data-team-key="${escapeHtml(autoRecord.teamKey)}" data-game-key="${escapeHtml(autoRecord.gameKey)}">View Auto</button>
-            <button class="button button--dark button--small auto-delete-button" type="button" data-team-key="${escapeHtml(autoRecord.teamKey)}" data-game-key="${escapeHtml(autoRecord.gameKey)}">Delete Auto</button>
+            <button class="button button--small auto-view-button" type="button" data-team-key="${escapeHtml(autoRecord.teamKey)}" data-game-key="${escapeHtml(autoRecord.gameKey)}">View Form</button>
+            <button class="button button--dark button--small auto-delete-button" type="button" data-team-key="${escapeHtml(autoRecord.teamKey)}" data-game-key="${escapeHtml(autoRecord.gameKey)}">Delete Form</button>
           </div>
         </article>
       `).join("")
-    : `<div class="empty">No saved autos for this team yet.</div>`;
+    : `<div class="empty">No saved ScoutingForms for this team yet.</div>`;
   const rankRows = rows.length
     ? rows.map((row) => `
         <tr>
@@ -2010,9 +2010,9 @@ function renderTeamDetail() {
         <strong>${scheduleStars}</strong>
       </article>
     </div>
-    <section class="team-auto-list" aria-label="Saved autonomous drawings">
+    <section class="team-auto-list" aria-label="Saved ScoutingForms">
       <div class="team-auto-list__header">
-        <h3>Saved Autos</h3>
+        <h3>Saved ScoutingForms</h3>
         <span>${savedAutos.length} saved</span>
       </div>
       ${autoRows}

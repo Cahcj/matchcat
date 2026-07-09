@@ -25,7 +25,7 @@
         <a href="#page-title" class="sidebar-link is-active">Dashboard</a>
         <button class="sidebar-link" id="picks-open" type="button">Picks</button>
         <button class="sidebar-link" id="sim-open" type="button">Alliance Simulator</button>
-        <button class="sidebar-link" id="auto-open" type="button">Auto Draw</button>
+        <button class="sidebar-link" id="auto-open" type="button">ScoutingForm</button>
         <a href="#matches" class="sidebar-link">Past Matches</a>
       </nav>
     </aside>
@@ -80,7 +80,7 @@
     <section class="auto-team-menu" id="auto-team-menu" aria-labelledby="auto-team-title" hidden>
       <form class="auto-team-card" id="auto-team-form">
         <div>
-          <p class="section-kicker">Autonomous</p>
+          <p class="section-kicker">ScoutingForm</p>
           <h2 id="auto-team-title">What team is this?</h2>
         </div>
         <label>
@@ -122,8 +122,8 @@
     <section class="auto-menu" id="auto-menu" aria-labelledby="auto-title" hidden>
       <div class="auto-menu__header">
         <div>
-          <p class="section-kicker">Autonomous</p>
-          <h2 id="auto-title">Auto Draw</h2>
+          <p class="section-kicker">ScoutingForm</p>
+          <h2 id="auto-title">ScoutingForm</h2>
           <small id="auto-current-team">No team selected</small>
         </div>
         <div class="auto-menu__photo" id="auto-menu-photo" hidden>
@@ -134,7 +134,7 @@
           <button class="button button--dark button--small" id="auto-close" type="button">Close</button>
         </div>
       </div>
-      <div class="auto-toolbar" aria-label="Autonomous drawing controls">
+      <div class="auto-toolbar" aria-label="ScoutingForm drawing controls">
         <div class="auto-toolbar__group">
           <button class="tool-button is-active" id="auto-robot-one" type="button">Robot 1</button>
           <button class="tool-button" id="auto-robot-two" type="button">Robot 2</button>
@@ -153,12 +153,12 @@
           Size
           <input id="auto-size" type="range" min="3" max="28" value="9">
         </label>
-        <button class="button button--dark button--small" id="auto-save" type="button">Save Auto</button>
+        <button class="button button--dark button--small" id="auto-save" type="button">Save Form</button>
         <button class="button button--dark button--small" id="auto-download" type="button">Download</button>
         <p class="auto-save-status" id="auto-save-status">Choose a team to save.</p>
       </div>
       <div class="auto-stage">
-        <canvas id="auto-canvas" width="1440" height="1440" aria-label="Draw autonomous path"></canvas>
+        <canvas id="auto-canvas" width="1440" height="1440" aria-label="Draw scouting path"></canvas>
       </div>
     </section>
 
