@@ -1163,13 +1163,13 @@ function renderClagueRating(rows) {
   const rate = record.played ? `${Math.round(record.winRate * 100)}% win rate` : "No played matches";
   const starText = starRating(stars) || "0 stars";
   const scheduleText = scheduleStrength.matches
-    ? `Schedule strength ${scheduleStrength.score}/100 (${starRating(scheduleStrength.stars) || "0 stars"})`
+    ? `Schedule strength ${starRating(scheduleStrength.stars) || "0 stars"}`
     : "Schedule strength --";
 
   els.clagueRating.innerHTML = `
     <span>Clague rating</span>
     <strong class="clague-rating__stars" aria-label="${stars} out of 5 stars">${starText}</strong>
-    <small>${escapeHtml(title)} / ${record.played ? `${record.wins}-${record.losses}-${record.ties}` : "0-0-0"} / ${rate} / ${escapeHtml(scheduleText)} / ${escapeHtml(rating.source)}</small>
+    <small>${escapeHtml(title)} / ${record.played ? `${record.wins}-${record.losses}-${record.ties}` : "0-0-0"} / ${rate} / ${scheduleText} / ${escapeHtml(rating.source)}</small>
   `;
 }
 
@@ -1547,9 +1547,6 @@ function renderTeamDetail() {
   const savedAutos = getAutosForTeam(teamNumber, teamName);
   const detailStars = stats?.stars ?? insight?.stars ?? 0;
   const scheduleStrength = getScheduleStrengthForTeam(teamNumber, eventKeyForCard);
-  const scheduleLabel = scheduleStrength.matches
-    ? `${scheduleStrength.score}/100`
-    : "--";
   const scheduleStars = scheduleStrength.matches
     ? starRating(scheduleStrength.stars) || "0 stars"
     : "No matches";
@@ -1613,8 +1610,7 @@ function renderTeamDetail() {
       </article>
       <article>
         <span>Strength of Schedule</span>
-        <strong>${escapeHtml(scheduleLabel)}</strong>
-        <small>${escapeHtml(scheduleStars)}</small>
+        <strong>${scheduleStars}</strong>
       </article>
     </div>
     <section class="team-auto-list" aria-label="Saved autonomous drawings">
