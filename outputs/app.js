@@ -65,6 +65,7 @@ const state = {
   autoGameLabel: "",
   autoAddedDate: "",
   autoMotorRpm: "312rpm",
+  autoRobotPhoto: "",
   selectedTeam: null,
 };
 
@@ -104,6 +105,10 @@ const els = {
   autoGameInput: document.querySelector("#auto-game-input"),
   autoDateInput: document.querySelector("#auto-date-input"),
   autoRpmInput: document.querySelector("#auto-rpm-input"),
+  autoPhotoInput: document.querySelector("#auto-photo-input"),
+  autoPhotoPreview: document.querySelector("#auto-photo-preview"),
+  autoPhotoImg: document.querySelector("#auto-photo-img"),
+  autoPhotoClear: document.querySelector("#auto-photo-clear"),
   autoTeamTest: document.querySelector("#auto-team-test"),
   autoTeamStatus: document.querySelector("#auto-team-status"),
   autoMenu: document.querySelector("#auto-menu"),
@@ -112,6 +117,8 @@ const els = {
   autoChangeTeam: document.querySelector("#auto-change-team"),
   autoBackdrop: document.querySelector("#auto-backdrop"),
   autoCurrentTeam: document.querySelector("#auto-current-team"),
+  autoMenuPhoto: document.querySelector("#auto-menu-photo"),
+  autoMenuPhotoImg: document.querySelector("#auto-menu-photo-img"),
   autoCanvas: document.querySelector("#auto-canvas"),
   autoRobotOne: document.querySelector("#auto-robot-one"),
   autoRobotTwo: document.querySelector("#auto-robot-two"),
@@ -202,10 +209,15 @@ els.autoTeamForm.addEventListener("submit", (event) => {
   event.preventDefault();
   startAutoForTypedTeam();
 });
+els.autoTeamInput.addEventListener("input", syncAutoPromptPhoto);
+els.autoGameInput.addEventListener("change", syncAutoPromptPhoto);
 els.autoTeamTest.addEventListener("click", () => {
   els.autoTeamInput.value = "Test Team";
+  syncAutoPromptPhoto();
   startAutoForTypedTeam();
 });
+els.autoPhotoInput.addEventListener("change", handleAutoPhotoInput);
+els.autoPhotoClear.addEventListener("click", clearAutoPhoto);
 els.autoRobotOne.addEventListener("click", () => setAutoRobot("one"));
 els.autoRobotTwo.addEventListener("click", () => setAutoRobot("two"));
 els.autoDraw.addEventListener("click", () => setAutoTool("draw"));
@@ -292,6 +304,8 @@ function openAutoTeamMenu() {
   els.autoGameInput.value = state.autoGameKey || getDefaultAutoGameKey();
   els.autoDateInput.value = state.autoAddedDate || getTodayDateString();
   els.autoRpmInput.value = state.autoMotorRpm || "312rpm";
+  els.autoPhotoInput.value = "";
+  syncAutoPromptPhoto();
   els.autoTeamStatus.textContent = getAutoTeamPromptStatus();
   setTimeout(() => els.autoTeamInput.focus(), 0);
 }
@@ -330,8 +344,100 @@ function startAutoForTypedTeam() {
     return;
   }
 
-  loadAutoDrawingForTeam(label, gameKey, addedDate, motorRpm);
+  loadAutoDrawingForTeam(label, gameKey, addedDate, motorRpm, state.autoRobotPhoto);
   openAutoMenu();
+}
+
+async function handleAutoPhotoInput(event) {
+  const file = event.target.files?.[0];
+
+  if (!file) return;
+
+  try {
+    state.autoRobotPhoto = await readAutoPhoto(file);
+    renderAutoPhotoPreview();
+    const promptTeamKey = getAutoTeamKey(els.autoTeamInput.value);
+    const promptGameKey = els.autoGameInput.value || getDefaultAutoGameKey();
+    const canSaveNow = state.autoTeamKey && promptTeamKey === state.autoTeamKey && promptGameKey === state.autoGameKey;
+
+    if (canSaveNow) {
+      saveAutoDrawing({ silent: true });
+      els.autoSaveStatus.textContent = `Robot picture saved for ${state.autoTeamLabel}.`;
+    }
+
+    els.autoTeamStatus.textContent = canSaveNow
+      ? `Robot picture saved for ${state.autoTeamLabel}.`
+      : "Robot picture ready to save with this auto.";
+  } catch (error) {
+    els.autoTeamStatus.textContent = "That picture could not be saved. Try a smaller photo.";
+  }
+}
+
+function clearAutoPhoto() {
+  state.autoRobotPhoto = "";
+  els.autoPhotoInput.value = "";
+  renderAutoPhotoPreview();
+  const promptTeamKey = getAutoTeamKey(els.autoTeamInput.value);
+  const promptGameKey = els.autoGameInput.value || getDefaultAutoGameKey();
+
+  if (state.autoTeamKey && promptTeamKey === state.autoTeamKey && promptGameKey === state.autoGameKey) {
+    saveAutoDrawing({ silent: true });
+  }
+
+  els.autoTeamStatus.textContent = "Robot picture removed.";
+}
+
+function syncAutoPromptPhoto() {
+  const promptTeamKey = getAutoTeamKey(els.autoTeamInput.value);
+  const promptGameKey = els.autoGameInput.value || getDefaultAutoGameKey();
+  const savedAuto = getAutoStorage()[promptTeamKey]?.autos?.[promptGameKey];
+  state.autoRobotPhoto = safeAutoPhotoSrc(savedAuto?.robotPhoto);
+  renderAutoPhotoPreview();
+}
+
+function readAutoPhoto(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.addEventListener("error", () => reject(new Error("Photo read failed.")));
+    reader.addEventListener("load", () => {
+      const image = new Image();
+
+      image.addEventListener("error", () => reject(new Error("Photo decode failed.")));
+      image.addEventListener("load", () => {
+        const maxSize = 900;
+        const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(image.width * scale));
+        canvas.height = Math.max(1, Math.round(image.height * scale));
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", 0.82));
+      });
+
+      image.src = reader.result;
+    });
+
+    reader.readAsDataURL(file);
+  });
+}
+
+function safeAutoPhotoSrc(src) {
+  return typeof src === "string" && src.startsWith("data:image/") ? src : "";
+}
+
+function renderAutoPhotoPreview() {
+  const src = safeAutoPhotoSrc(state.autoRobotPhoto);
+
+  els.autoPhotoPreview.hidden = !src;
+  els.autoPhotoImg.src = src;
+  els.autoMenuPhoto.hidden = !src;
+  els.autoMenuPhotoImg.src = src;
+}
+
+function updateAutoHeader() {
+  els.autoCurrentTeam.textContent = `Team: ${state.autoTeamLabel} | ${state.autoGameLabel} | ${state.autoAddedDate} | ${state.autoMotorRpm}`;
+  renderAutoPhotoPreview();
 }
 
 function setAutoTool(tool) {
@@ -473,10 +579,19 @@ function normalizeAutoTeamRecord(teamKey, record) {
   const fallbackLabel = record?.label || teamKey;
 
   if (record?.autos && typeof record.autos === "object") {
+    const autos = {};
+
+    Object.entries(record.autos).forEach(([gameKey, autoRecord]) => {
+      autos[gameKey] = {
+        ...autoRecord,
+        robotPhoto: safeAutoPhotoSrc(autoRecord?.robotPhoto),
+      };
+    });
+
     return {
       label: fallbackLabel,
       updatedAt: record.updatedAt || "",
-      autos: record.autos,
+      autos,
     };
   }
 
@@ -491,6 +606,7 @@ function normalizeAutoTeamRecord(teamKey, record) {
           gameLabel: getAutoGameLabel(gameKey),
           addedDate: record.addedDate || record.updatedAt?.slice(0, 10) || getTodayDateString(),
           motorRpm: record.motorRpm || "312rpm",
+          robotPhoto: safeAutoPhotoSrc(record.robotPhoto),
           updatedAt: record.updatedAt || "",
           strokes: record.strokes,
         },
@@ -510,6 +626,7 @@ function loadAutoDrawingForTeam(
   gameKey = getDefaultAutoGameKey(),
   addedDate = getTodayDateString(),
   motorRpm = "312rpm",
+  robotPhoto = "",
 ) {
   const key = getAutoTeamKey(label);
   const storage = getAutoStorage();
@@ -522,11 +639,12 @@ function loadAutoDrawingForTeam(
   state.autoGameLabel = savedAuto?.gameLabel || getAutoGameLabel(gameKey);
   state.autoAddedDate = savedAuto?.addedDate || addedDate;
   state.autoMotorRpm = savedAuto?.motorRpm || motorRpm;
+  state.autoRobotPhoto = safeAutoPhotoSrc(robotPhoto) || safeAutoPhotoSrc(savedAuto?.robotPhoto);
   state.autoStrokes = Array.isArray(savedAuto?.strokes) ? savedAuto.strokes : [];
   state.autoCurrentStroke = null;
   state.autoDrawing = false;
   resetAutoRobotDistances();
-  els.autoCurrentTeam.textContent = `Team: ${state.autoTeamLabel} | ${state.autoGameLabel} | ${state.autoAddedDate} | ${state.autoMotorRpm}`;
+  updateAutoHeader();
   els.autoSaveStatus.textContent = savedAuto
     ? `Loaded ${state.autoGameLabel} auto for ${state.autoTeamLabel}.`
     : `New ${state.autoGameLabel} auto for ${state.autoTeamLabel}.`;
@@ -554,6 +672,7 @@ function saveAutoDrawing(options = {}) {
     gameLabel: state.autoGameLabel || getAutoGameLabel(gameKey),
     addedDate: state.autoAddedDate || getTodayDateString(),
     motorRpm: state.autoMotorRpm || "312rpm",
+    robotPhoto: safeAutoPhotoSrc(state.autoRobotPhoto),
     updatedAt: new Date().toISOString(),
     strokes: state.autoStrokes,
   };
@@ -601,12 +720,13 @@ function openSavedAuto(teamKey, gameKey) {
   state.autoGameLabel = autoRecord.gameLabel || getAutoGameLabel(gameKey);
   state.autoAddedDate = autoRecord.addedDate || getTodayDateString();
   state.autoMotorRpm = autoRecord.motorRpm || "312rpm";
+  state.autoRobotPhoto = safeAutoPhotoSrc(autoRecord.robotPhoto);
   state.autoStrokes = Array.isArray(autoRecord.strokes) ? autoRecord.strokes : [];
   state.autoCurrentStroke = null;
   state.autoDrawing = false;
   resetAutoRobotDistances();
   openAutoMenu();
-  els.autoCurrentTeam.textContent = `Team: ${state.autoTeamLabel} | ${state.autoGameLabel} | ${state.autoAddedDate} | ${state.autoMotorRpm}`;
+  updateAutoHeader();
   els.autoSaveStatus.textContent = `Viewing saved ${state.autoGameLabel} auto for ${state.autoTeamLabel}.`;
 }
 
@@ -625,8 +745,10 @@ function deleteSavedAuto(teamKey, gameKey) {
 
   if (state.autoTeamKey === teamKey && state.autoGameKey === gameKey) {
     state.autoStrokes = [];
+    state.autoRobotPhoto = "";
     state.autoCurrentStroke = null;
     resetAutoRobotDistances();
+    renderAutoPhotoPreview();
     renderAutoCanvas();
   }
 
@@ -1566,6 +1688,7 @@ function renderTeamDetail() {
   const autoRows = savedAutos.length
     ? savedAutos.map((autoRecord) => `
         <article class="team-auto-card">
+          ${safeAutoPhotoSrc(autoRecord.robotPhoto) ? `<img class="team-auto-card__photo" src="${safeAutoPhotoSrc(autoRecord.robotPhoto)}" alt="${escapeHtml(autoRecord.label)} robot">` : ""}
           <div>
             <span>${escapeHtml(autoRecord.gameLabel || getAutoGameLabel(autoRecord.gameKey))}</span>
             <strong>${escapeHtml(autoRecord.addedDate || "No date")}</strong>

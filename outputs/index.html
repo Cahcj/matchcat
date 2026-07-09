@@ -79,6 +79,14 @@
             <option value="470rpm+">470rpm+</option>
           </select>
         </label>
+        <label>
+          Robot picture
+          <input id="auto-photo-input" type="file" accept="image/*" capture="environment">
+        </label>
+        <div class="auto-photo-preview" id="auto-photo-preview" hidden>
+          <img id="auto-photo-img" alt="Robot picture preview">
+          <button class="button button--dark button--small" id="auto-photo-clear" type="button">Remove Photo</button>
+        </div>
         <div class="auto-team-actions">
           <button class="button button--dark button--small" id="auto-team-test" type="button">Test Team</button>
           <button class="button button--small" type="submit">Start Drawing</button>
@@ -92,6 +100,9 @@
           <p class="section-kicker">Autonomous</p>
           <h2 id="auto-title">Auto Draw</h2>
           <small id="auto-current-team">No team selected</small>
+        </div>
+        <div class="auto-menu__photo" id="auto-menu-photo" hidden>
+          <img id="auto-menu-photo-img" alt="Saved robot picture">
         </div>
         <div class="auto-menu__actions">
           <button class="button button--dark button--small" id="auto-change-team" type="button">Change Team</button>

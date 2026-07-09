@@ -184,6 +184,37 @@ main {
   outline: none;
 }
 
+.auto-photo-preview {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel-soft);
+  padding: 10px;
+}
+
+.auto-photo-preview[hidden],
+.auto-menu__photo[hidden] {
+  display: none !important;
+}
+
+.auto-photo-preview img,
+.auto-menu__photo img,
+.team-auto-card__photo {
+  display: block;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border: 1px solid rgba(25, 195, 125, 0.24);
+  border-radius: 12px;
+  background: #05090b;
+}
+
+.auto-photo-preview img {
+  width: 72px;
+}
+
 .auto-team-actions,
 .auto-menu__actions {
   display: flex;
@@ -224,6 +255,14 @@ main {
   color: var(--green);
   font-size: 0.78rem;
   font-weight: 900;
+}
+
+.auto-menu__photo {
+  margin-left: auto;
+}
+
+.auto-menu__photo img {
+  width: 76px;
 }
 
 .picks-menu__status {
@@ -935,6 +974,11 @@ td {
   padding: 12px;
 }
 
+.team-auto-card__photo {
+  width: 64px;
+  flex: 0 0 64px;
+}
+
 .team-auto-card div:first-child {
   display: grid;
   gap: 3px;
@@ -1116,7 +1160,16 @@ td {
 
   .picks-menu__header,
   .auto-menu__header {
+    flex-wrap: wrap;
     padding: 16px;
+  }
+
+  .auto-menu__photo {
+    margin-left: 0;
+  }
+
+  .auto-menu__photo img {
+    width: 58px;
   }
 
   .auto-toolbar {
