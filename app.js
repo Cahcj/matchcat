@@ -33,6 +33,10 @@ const state = {
   teamSeasonEventCache: new Map(),
   eventFilter: "all",
   picksEventFilter: "all",
+  autoTool: "draw",
+  autoDrawing: false,
+  autoStrokes: [],
+  autoCurrentStroke: null,
   selectedTeam: null,
 };
 
@@ -60,6 +64,18 @@ const els = {
   picksOpen: document.querySelector("#picks-open"),
   picksClose: document.querySelector("#picks-close"),
   picksBackdrop: document.querySelector("#picks-backdrop"),
+  autoMenu: document.querySelector("#auto-menu"),
+  autoOpen: document.querySelector("#auto-open"),
+  autoClose: document.querySelector("#auto-close"),
+  autoBackdrop: document.querySelector("#auto-backdrop"),
+  autoCanvas: document.querySelector("#auto-canvas"),
+  autoDraw: document.querySelector("#auto-draw"),
+  autoErase: document.querySelector("#auto-erase"),
+  autoUndo: document.querySelector("#auto-undo"),
+  autoClear: document.querySelector("#auto-clear"),
+  autoColor: document.querySelector("#auto-color"),
+  autoSize: document.querySelector("#auto-size"),
+  autoDownload: document.querySelector("#auto-download"),
   sidebarToggle: document.querySelector("#sidebar-toggle"),
   sidebarBackdrop: document.querySelector("#sidebar-backdrop"),
   teamDetailPanel: document.querySelector("#team-detail-panel"),
@@ -115,6 +131,19 @@ els.sidebarBackdrop.addEventListener("click", closeSidebar);
 els.picksOpen.addEventListener("click", openPicksMenu);
 els.picksClose.addEventListener("click", closePicksMenu);
 els.picksBackdrop.addEventListener("click", closePicksMenu);
+els.autoOpen.addEventListener("click", openAutoMenu);
+els.autoClose.addEventListener("click", closeAutoMenu);
+els.autoBackdrop.addEventListener("click", closeAutoMenu);
+els.autoDraw.addEventListener("click", () => setAutoTool("draw"));
+els.autoErase.addEventListener("click", () => setAutoTool("erase"));
+els.autoUndo.addEventListener("click", undoAutoStroke);
+els.autoClear.addEventListener("click", clearAutoCanvas);
+els.autoDownload.addEventListener("click", downloadAutoCanvas);
+els.autoCanvas.addEventListener("pointerdown", startAutoStroke);
+els.autoCanvas.addEventListener("pointermove", continueAutoStroke);
+els.autoCanvas.addEventListener("pointerup", endAutoStroke);
+els.autoCanvas.addEventListener("pointercancel", endAutoStroke);
+els.autoCanvas.addEventListener("pointerleave", endAutoStroke);
 
 document.querySelectorAll(".sidebar-link[href]").forEach((link) => {
   link.addEventListener("click", () => {
@@ -122,6 +151,7 @@ document.querySelectorAll(".sidebar-link[href]").forEach((link) => {
       item.classList.toggle("is-active", item === link);
     });
     closePicksMenu();
+    closeAutoMenu();
     closeSidebar();
   });
 });
@@ -137,6 +167,7 @@ function openPicksMenu() {
     item.classList.toggle("is-active", item === els.picksOpen);
   });
   closeSidebar();
+  closeAutoMenu();
   document.body.classList.add("picks-open");
   els.picksMenu.hidden = false;
   els.picksBackdrop.hidden = false;
@@ -148,14 +179,170 @@ function closePicksMenu() {
   els.picksBackdrop.hidden = true;
 }
 
+function openAutoMenu() {
+  document.querySelectorAll(".sidebar-link").forEach((item) => {
+    item.classList.toggle("is-active", item === els.autoOpen);
+  });
+  closeSidebar();
+  closePicksMenu();
+  document.body.classList.add("auto-open");
+  els.autoMenu.hidden = false;
+  els.autoBackdrop.hidden = false;
+  renderAutoCanvas();
+}
+
+function closeAutoMenu() {
+  document.body.classList.remove("auto-open");
+  els.autoMenu.hidden = true;
+  els.autoBackdrop.hidden = true;
+  endAutoStroke();
+}
+
+function setAutoTool(tool) {
+  state.autoTool = tool;
+  els.autoDraw.classList.toggle("is-active", tool === "draw");
+  els.autoErase.classList.toggle("is-active", tool === "erase");
+}
+
+function startAutoStroke(event) {
+  event.preventDefault();
+  const point = getAutoCanvasPoint(event);
+  state.autoDrawing = true;
+  state.autoCurrentStroke = {
+    tool: state.autoTool,
+    color: els.autoColor.value,
+    size: Number(els.autoSize.value),
+    points: [point],
+  };
+  els.autoCanvas.setPointerCapture(event.pointerId);
+  renderAutoCanvas();
+}
+
+function continueAutoStroke(event) {
+  if (!state.autoDrawing || !state.autoCurrentStroke) return;
+
+  event.preventDefault();
+  state.autoCurrentStroke.points.push(getAutoCanvasPoint(event));
+  renderAutoCanvas();
+}
+
+function endAutoStroke() {
+  if (!state.autoDrawing || !state.autoCurrentStroke) return;
+
+  if (state.autoCurrentStroke.points.length > 1) {
+    state.autoStrokes.push(state.autoCurrentStroke);
+  }
+  state.autoDrawing = false;
+  state.autoCurrentStroke = null;
+  renderAutoCanvas();
+}
+
+function undoAutoStroke() {
+  state.autoStrokes.pop();
+  renderAutoCanvas();
+}
+
+function clearAutoCanvas() {
+  state.autoStrokes = [];
+  state.autoCurrentStroke = null;
+  state.autoDrawing = false;
+  renderAutoCanvas();
+}
+
+function downloadAutoCanvas() {
+  renderAutoCanvas();
+  const link = document.createElement("a");
+  link.download = `matchcat-auto-${new Date().toISOString().slice(0, 10)}.png`;
+  link.href = els.autoCanvas.toDataURL("image/png");
+  link.click();
+}
+
+function getAutoCanvasPoint(event) {
+  const rect = els.autoCanvas.getBoundingClientRect();
+  const scaleX = els.autoCanvas.width / rect.width;
+  const scaleY = els.autoCanvas.height / rect.height;
+
+  return {
+    x: (event.clientX - rect.left) * scaleX,
+    y: (event.clientY - rect.top) * scaleY,
+  };
+}
+
+function renderAutoCanvas() {
+  const canvas = els.autoCanvas;
+  const ctx = canvas.getContext("2d");
+
+  drawAutoField(ctx, canvas.width, canvas.height);
+  [...state.autoStrokes, state.autoCurrentStroke].filter(Boolean).forEach((stroke) => {
+    drawAutoStroke(ctx, stroke);
+  });
+}
+
+function drawAutoField(ctx, width, height) {
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = "#101011";
+  ctx.fillRect(0, 0, width, height);
+
+  const tile = width / 6;
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.13)";
+
+  for (let index = 0; index <= 6; index += 1) {
+    const pos = index * tile;
+    ctx.beginPath();
+    ctx.moveTo(pos, 0);
+    ctx.lineTo(pos, height);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, pos);
+    ctx.lineTo(width, pos);
+    ctx.stroke();
+  }
+
+  ctx.lineWidth = 8;
+  ctx.strokeStyle = "rgba(35, 136, 217, 0.62)";
+  ctx.strokeRect(18, 18, width - 36, height - 36);
+
+  ctx.fillStyle = "rgba(35, 136, 217, 0.13)";
+  ctx.fillRect(0, 0, width, tile * 1.25);
+  ctx.fillStyle = "rgba(25, 195, 125, 0.13)";
+  ctx.fillRect(0, height - tile * 1.25, width, tile * 1.25);
+
+  ctx.fillStyle = "rgba(246, 247, 251, 0.62)";
+  ctx.font = "900 38px Inter, sans-serif";
+  ctx.fillText("BACKSTAGE / START", 42, height - 54);
+  ctx.fillText("SCORING SIDE", 42, 70);
+  ctx.fillStyle = "rgba(25, 195, 125, 0.9)";
+  ctx.beginPath();
+  ctx.arc(width - 92, height - 92, 36, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawAutoStroke(ctx, stroke) {
+  if (stroke.points.length < 2) return;
+
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.lineWidth = stroke.tool === "erase" ? Math.max(stroke.size * 2.4, 24) : stroke.size;
+  ctx.strokeStyle = stroke.tool === "erase" ? "#101011" : stroke.color;
+  ctx.beginPath();
+  ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+  stroke.points.slice(1).forEach((point) => ctx.lineTo(point.x, point.y));
+  ctx.stroke();
+  ctx.restore();
+}
+
 document.addEventListener("click", (event) => {
   const teamButton = event.target.closest(".team-link");
   if (!teamButton) return;
 
   closePicksMenu();
+  closeAutoMenu();
   openTeamDetail(Number(teamButton.dataset.teamNumber), teamButton.dataset.eventKey);
 });
 
+renderAutoCanvas();
 loadTracker();
 
 async function loadTracker() {

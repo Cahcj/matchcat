@@ -24,6 +24,7 @@
       <nav class="app-sidebar__nav">
         <a href="#page-title" class="sidebar-link is-active">Dashboard</a>
         <button class="sidebar-link" id="picks-open" type="button">Picks</button>
+        <button class="sidebar-link" id="auto-open" type="button">Auto Draw</button>
         <a href="#matches" class="sidebar-link">Past Matches</a>
       </nav>
     </aside>
@@ -48,6 +49,36 @@
       <div class="status picks-menu__status" id="picks-status">Ranking teams from FTCScout data...</div>
       <div class="picks-list" id="picks-list">
         <div class="empty">Loading pick list...</div>
+      </div>
+    </section>
+    <div class="auto-backdrop" id="auto-backdrop" hidden></div>
+    <section class="auto-menu" id="auto-menu" aria-labelledby="auto-title" hidden>
+      <div class="auto-menu__header">
+        <div>
+          <p class="section-kicker">Autonomous</p>
+          <h2 id="auto-title">Auto Draw</h2>
+        </div>
+        <button class="button button--dark button--small" id="auto-close" type="button">Close</button>
+      </div>
+      <div class="auto-toolbar" aria-label="Autonomous drawing controls">
+        <div class="auto-toolbar__group">
+          <button class="tool-button is-active" id="auto-draw" type="button">Draw</button>
+          <button class="tool-button" id="auto-erase" type="button">Erase</button>
+          <button class="tool-button" id="auto-undo" type="button">Undo</button>
+          <button class="tool-button" id="auto-clear" type="button">Clear</button>
+        </div>
+        <label>
+          Color
+          <input id="auto-color" type="color" value="#19c37d">
+        </label>
+        <label>
+          Size
+          <input id="auto-size" type="range" min="3" max="28" value="9">
+        </label>
+        <button class="button button--dark button--small" id="auto-download" type="button">Download</button>
+      </div>
+      <div class="auto-stage">
+        <canvas id="auto-canvas" width="1440" height="1440" aria-label="Draw autonomous path"></canvas>
       </div>
     </section>
 
