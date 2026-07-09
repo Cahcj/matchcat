@@ -36,6 +36,78 @@ a {
   color: inherit;
 }
 
+main {
+  margin-left: 236px;
+}
+
+.mobile-menu-button {
+  display: none;
+}
+
+.app-sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 40;
+  width: 236px;
+  display: grid;
+  align-content: start;
+  gap: 24px;
+  border-right: 1px solid var(--line);
+  background: rgba(12, 12, 13, 0.96);
+  box-shadow: var(--shadow);
+  padding: 26px 18px;
+}
+
+.app-sidebar__brand {
+  display: grid;
+  gap: 4px;
+  padding: 8px 8px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.app-sidebar__brand strong {
+  color: var(--ink);
+  font-size: 1.45rem;
+  line-height: 1;
+}
+
+.app-sidebar__brand span {
+  color: var(--green);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.app-sidebar__nav {
+  display: grid;
+  gap: 8px;
+}
+
+.sidebar-link {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 0 13px;
+  color: var(--muted);
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.sidebar-link:hover,
+.sidebar-link:focus-visible,
+.sidebar-link.is-active {
+  border-color: rgba(25, 195, 125, 0.26);
+  background: rgba(25, 195, 125, 0.1);
+  color: var(--green);
+  outline: none;
+}
+
+.sidebar-backdrop {
+  display: none;
+}
+
 .hero {
   position: relative;
   min-height: 390px;
@@ -595,11 +667,139 @@ td {
   min-width: 940px;
 }
 
+.picks-list {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+}
+
+.pick-card {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) minmax(260px, auto);
+  gap: 16px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel-soft);
+  padding: 14px;
+}
+
+.pick-card__rank {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--green);
+  color: #06130d;
+  font-weight: 950;
+}
+
+.pick-card__main {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.pick-card__team {
+  width: auto;
+  max-width: none;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  color: var(--ink);
+  font-size: 1.05rem;
+}
+
+.pick-card__team span {
+  color: var(--green);
+}
+
+.pick-card__meta {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.pick-card__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(72px, 1fr));
+  gap: 8px;
+}
+
+.pick-card__stats span {
+  display: grid;
+  gap: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.035);
+  padding: 8px 10px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.pick-card__stats strong {
+  color: var(--ink);
+  font-size: 1rem;
+}
+
 .mobile-match-card {
   display: none;
 }
 
 @media (max-width: 980px) {
+  main {
+    margin-left: 0;
+  }
+
+  .mobile-menu-button {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 60;
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    gap: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    background: rgba(10, 10, 11, 0.92);
+    box-shadow: var(--shadow);
+    padding: 10px;
+  }
+
+  .mobile-menu-button span {
+    width: 20px;
+    height: 2px;
+    border-radius: 999px;
+    background: var(--ink);
+  }
+
+  .app-sidebar {
+    width: min(280px, 82vw);
+    transform: translateX(-105%);
+    transition: transform 180ms ease;
+  }
+
+  .sidebar-open .app-sidebar {
+    transform: translateX(0);
+  }
+
+  .sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 35;
+    display: block;
+    background: rgba(0, 0, 0, 0.58);
+  }
+
+  .sidebar-backdrop[hidden] {
+    display: none;
+  }
+
   .summary-grid,
   .upcoming-panel,
   .upcoming-match,
@@ -624,6 +824,14 @@ td {
   .status {
     max-width: none;
     text-align: left;
+  }
+
+  .pick-card {
+    grid-template-columns: 48px minmax(0, 1fr);
+  }
+
+  .pick-card__stats {
+    grid-column: 1 / -1;
   }
 }
 

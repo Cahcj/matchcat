@@ -52,6 +52,10 @@ const els = {
   latestEvent: document.querySelector("#latest-event"),
   upcomingCard: document.querySelector("#upcoming-card"),
   matchBody: document.querySelector("#match-body"),
+  picksList: document.querySelector("#picks-list"),
+  picksStatus: document.querySelector("#picks-status"),
+  sidebarToggle: document.querySelector("#sidebar-toggle"),
+  sidebarBackdrop: document.querySelector("#sidebar-backdrop"),
   teamDetailPanel: document.querySelector("#team-detail-panel"),
   teamDetailTitle: document.querySelector("#team-detail-title"),
   teamDetailBody: document.querySelector("#team-detail-body"),
@@ -89,6 +93,29 @@ els.teamDetailClose.addEventListener("click", () => {
   state.selectedTeam = null;
   renderTeamDetail();
 });
+
+els.sidebarToggle.addEventListener("click", () => {
+  const isOpen = document.body.classList.toggle("sidebar-open");
+  els.sidebarToggle.setAttribute("aria-expanded", String(isOpen));
+  els.sidebarBackdrop.hidden = !isOpen;
+});
+
+els.sidebarBackdrop.addEventListener("click", closeSidebar);
+
+document.querySelectorAll(".sidebar-link").forEach((link) => {
+  link.addEventListener("click", () => {
+    document.querySelectorAll(".sidebar-link").forEach((item) => {
+      item.classList.toggle("is-active", item === link);
+    });
+    closeSidebar();
+  });
+});
+
+function closeSidebar() {
+  document.body.classList.remove("sidebar-open");
+  els.sidebarToggle.setAttribute("aria-expanded", "false");
+  els.sidebarBackdrop.hidden = true;
+}
 
 document.addEventListener("click", (event) => {
   const teamButton = event.target.closest(".team-link");
@@ -133,6 +160,8 @@ async function loadTracker() {
   } catch (error) {
     console.error(error);
     setStatus("FTCScout data could not load right now.");
+    els.picksStatus.textContent = "No pick data loaded.";
+    els.picksList.innerHTML = `<div class="empty">No pick data returned for this team and season.</div>`;
     els.matchBody.innerHTML = `<tr><td colspan="8" class="empty">No live data returned for this team and season.</td></tr>`;
   }
 }
@@ -250,6 +279,7 @@ function render() {
   renderClagueRating(visibleRows);
   renderUpcomingMatch(upcomingMatch);
   renderTeamDetail();
+  renderPicks(visibleRows);
   renderMatches(pastRows);
 }
 
@@ -457,6 +487,86 @@ function renderUpcomingMatch(nextMatch) {
       </div>
     </article>
   `;
+}
+
+function renderPicks(rows) {
+  const picks = getPickCandidates(rows).slice(0, 12);
+  const scope = state.eventFilter === "all"
+    ? getSeasonLabel(state.year)
+    : eventDisplayName(state.eventFilter);
+
+  els.picksStatus.textContent = picks.length
+    ? `Best options for ${scope}.`
+    : `No pick data found for ${scope}.`;
+
+  if (!picks.length) {
+    els.picksList.innerHTML = `<div class="empty">No ranked pick options found yet.</div>`;
+    return;
+  }
+
+  els.picksList.innerHTML = picks.map((pick, index) => `
+    <article class="pick-card">
+      <div class="pick-card__rank">#${index + 1}</div>
+      <div class="pick-card__main">
+        <button class="team-link pick-card__team" type="button" data-team-number="${pick.teamNumber}" data-event-key="${escapeHtml(pick.eventKey)}">
+          <span>${pick.teamNumber}</span>
+          ${escapeHtml(pick.name)}
+        </button>
+        <div class="pick-card__meta">${escapeHtml(pick.eventName)} / ${pick.record} / ${pick.winRate}% win rate</div>
+        <div class="stars" aria-label="${pick.stars} out of 5 stars">${starRating(pick.stars)}</div>
+      </div>
+      <div class="pick-card__stats">
+        <span>Rank <strong>${Number.isFinite(pick.rank) ? pick.rank : "--"}</strong></span>
+        <span>OPR <strong>${Number.isFinite(pick.opr) ? pick.opr.toFixed(1) : "--"}</strong></span>
+        <span>Score <strong>${Math.round(pick.pickScore * 100)}</strong></span>
+      </div>
+    </article>
+  `).join("");
+}
+
+function getPickCandidates(rows) {
+  const visibleEventKeys = new Set(rows.map((row) => row.eventKey));
+  const bestByTeam = new Map();
+
+  state.teamEventStats.forEach((stats) => {
+    if (stats.teamNumber === TEAM_NUMBER || !stats.played) return;
+    if (visibleEventKeys.size && !visibleEventKeys.has(stats.eventKey)) return;
+
+    const rank = state.teamEventRanks.get(teamStatsKey(stats.eventKey, stats.teamNumber));
+    const rankScore = Number.isFinite(rank) ? 1 / Math.max(rank, 1) : 0;
+    const oprScore = Number.isFinite(stats.opr) ? Math.min(1, Math.max(0, stats.opr / 120)) : 0;
+    const ratingScore = Number.isFinite(stats.ratingScore) ? stats.ratingScore : stats.winRate;
+    const pickScore = weightedRatingScore([
+      { value: ratingScore, weight: 0.5 },
+      { value: oprScore, weight: 0.28 },
+      { value: stats.winRate, weight: 0.14 },
+      { value: rankScore, weight: 0.08 },
+    ]);
+    const current = {
+      teamNumber: stats.teamNumber,
+      name: state.teamNames.get(stats.teamNumber) ?? `Team ${stats.teamNumber}`,
+      eventKey: stats.eventKey,
+      eventName: eventDisplayName(stats.eventKey),
+      rank,
+      opr: stats.opr,
+      stars: stats.stars ?? Math.round((pickScore ?? 0) * 5),
+      record: `${stats.wins}-${stats.losses}-${stats.ties}`,
+      winRate: Math.round(stats.winRate * 100),
+      pickScore: pickScore ?? 0,
+    };
+    const previous = bestByTeam.get(stats.teamNumber);
+
+    if (!previous || current.pickScore > previous.pickScore) {
+      bestByTeam.set(stats.teamNumber, current);
+    }
+  });
+
+  return [...bestByTeam.values()].sort((a, b) =>
+    b.pickScore - a.pickScore ||
+    (b.opr ?? 0) - (a.opr ?? 0) ||
+    (a.rank ?? Number.POSITIVE_INFINITY) - (b.rank ?? Number.POSITIVE_INFINITY) ||
+    a.teamNumber - b.teamNumber,
+  );
 }
 
 async function openTeamDetail(teamNumber, eventKeyForCard) {
@@ -1141,6 +1251,8 @@ function setLoading() {
     <small>Waiting for FTCScout data</small>
   `;
   els.upcomingCard.innerHTML = `<div class="empty">Loading next match...</div>`;
+  els.picksStatus.textContent = "Ranking teams from FTCScout data...";
+  els.picksList.innerHTML = `<div class="empty">Loading pick list...</div>`;
   els.matchBody.innerHTML = `<tr><td colspan="8" class="empty">Loading matches from FTCScout...</td></tr>`;
   setStatus("Loading FTCScout data...");
 }

@@ -11,6 +11,24 @@
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
+    <button class="mobile-menu-button" id="sidebar-toggle" type="button" aria-label="Open navigation" aria-expanded="false">
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+    <aside class="app-sidebar" id="app-sidebar" aria-label="MatchCat navigation">
+      <div class="app-sidebar__brand">
+        <strong>MatchCat</strong>
+        <span>Team 7305</span>
+      </div>
+      <nav class="app-sidebar__nav">
+        <a href="#page-title" class="sidebar-link is-active">Dashboard</a>
+        <a href="#picks" class="sidebar-link">Picks</a>
+        <a href="#matches" class="sidebar-link">Past Matches</a>
+      </nav>
+    </aside>
+    <div class="sidebar-backdrop" id="sidebar-backdrop" hidden></div>
+
     <main>
       <section class="hero" aria-labelledby="page-title">
         <img class="hero__image" src="matchcat-hero.png" alt="">
@@ -96,6 +114,19 @@
             <button class="button button--dark button--small" id="team-detail-close" type="button">Close</button>
           </div>
           <div class="team-detail" id="team-detail-body"></div>
+        </section>
+
+        <section class="panel picks-panel" id="picks">
+          <div class="panel__header">
+            <div>
+              <p class="section-kicker">Alliance Captain</p>
+              <h2>Picks</h2>
+            </div>
+            <div class="status" id="picks-status">Ranking teams from FTCScout data...</div>
+          </div>
+          <div class="picks-list" id="picks-list">
+            <div class="empty">Loading pick list...</div>
+          </div>
         </section>
 
         <section class="panel" id="matches">
