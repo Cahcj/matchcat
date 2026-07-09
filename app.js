@@ -3,6 +3,16 @@ const TEAM_NUMBER = 7305;
 const AUTO_FIELD_IMAGE_SRC = "auto-field.png";
 const AUTO_ROBOT_SIZE = 78;
 const AUTO_ROBOT_SPEED = 430;
+const AUTO_ROBOTS = {
+  one: {
+    label: "7305 A",
+    color: "#19c37d",
+  },
+  two: {
+    label: "7305 B",
+    color: "#2388d9",
+  },
+};
 const GAME_SEASONS = {
   2013: "2012-2013 Ring It Up!",
   2014: "2013-2014 Block Party!",
@@ -37,11 +47,15 @@ const state = {
   eventFilter: "all",
   picksEventFilter: "all",
   autoTool: "draw",
+  autoSelectedRobot: "one",
   autoDrawing: false,
   autoStrokes: [],
   autoCurrentStroke: null,
   autoRobotPlaying: false,
-  autoRobotDistance: 0,
+  autoRobotDistances: {
+    one: 0,
+    two: 0,
+  },
   autoRobotFrame: null,
   autoRobotLastTime: 0,
   selectedTeam: null,
@@ -82,6 +96,8 @@ const els = {
   autoClose: document.querySelector("#auto-close"),
   autoBackdrop: document.querySelector("#auto-backdrop"),
   autoCanvas: document.querySelector("#auto-canvas"),
+  autoRobotOne: document.querySelector("#auto-robot-one"),
+  autoRobotTwo: document.querySelector("#auto-robot-two"),
   autoDraw: document.querySelector("#auto-draw"),
   autoErase: document.querySelector("#auto-erase"),
   autoPlay: document.querySelector("#auto-play"),
@@ -155,6 +171,8 @@ els.autoOpen.addEventListener("click", (event) => {
 });
 els.autoClose.addEventListener("click", closeAutoMenu);
 els.autoBackdrop.addEventListener("click", closeAutoMenu);
+els.autoRobotOne.addEventListener("click", () => setAutoRobot("one"));
+els.autoRobotTwo.addEventListener("click", () => setAutoRobot("two"));
 els.autoDraw.addEventListener("click", () => setAutoTool("draw"));
 els.autoErase.addEventListener("click", () => setAutoTool("erase"));
 els.autoPlay.addEventListener("click", playAutoPath);
@@ -231,6 +249,13 @@ function setAutoTool(tool) {
   els.autoErase.classList.toggle("is-active", tool === "erase");
 }
 
+function setAutoRobot(robotId) {
+  state.autoSelectedRobot = robotId;
+  els.autoRobotOne.classList.toggle("is-active", robotId === "one");
+  els.autoRobotTwo.classList.toggle("is-active", robotId === "two");
+  els.autoColor.value = AUTO_ROBOTS[robotId].color;
+}
+
 function startAutoStroke(event) {
   event.preventDefault();
   stopAutoPath();
@@ -238,6 +263,7 @@ function startAutoStroke(event) {
   state.autoDrawing = true;
   state.autoCurrentStroke = {
     tool: state.autoTool,
+    robot: state.autoSelectedRobot,
     color: els.autoColor.value,
     size: Number(els.autoSize.value),
     points: [point],
@@ -268,7 +294,7 @@ function endAutoStroke() {
 function undoAutoStroke() {
   stopAutoPath();
   state.autoStrokes.pop();
-  state.autoRobotDistance = 0;
+  resetAutoRobotDistances();
   renderAutoCanvas();
 }
 
@@ -277,7 +303,7 @@ function clearAutoCanvas() {
   state.autoStrokes = [];
   state.autoCurrentStroke = null;
   state.autoDrawing = false;
-  state.autoRobotDistance = 0;
+  resetAutoRobotDistances();
   renderAutoCanvas();
 }
 
@@ -308,7 +334,9 @@ function renderAutoCanvas() {
   [...state.autoStrokes, state.autoCurrentStroke].filter(Boolean).forEach((stroke) => {
     drawAutoStroke(ctx, stroke);
   });
-  drawAutoRobot(ctx);
+  Object.keys(AUTO_ROBOTS).forEach((robotId) => {
+    drawAutoRobot(ctx, robotId);
+  });
 }
 
 function drawAutoField(ctx, width, height) {
@@ -373,15 +401,15 @@ function drawAutoStroke(ctx, stroke) {
 }
 
 function playAutoPath() {
-  const pathLength = getAutoPathLength();
+  const canPlay = Object.keys(AUTO_ROBOTS).some((robotId) => getAutoPathLength(robotId) > 0);
 
-  if (pathLength <= 0) {
+  if (!canPlay) {
     return;
   }
 
   stopAutoPath();
   state.autoRobotPlaying = true;
-  state.autoRobotDistance = 0;
+  resetAutoRobotDistances();
   state.autoRobotLastTime = 0;
   els.autoPlay.classList.add("is-active");
   state.autoRobotFrame = requestAnimationFrame(stepAutoRobot);
@@ -409,11 +437,22 @@ function stepAutoRobot(timestamp) {
 
   const elapsedSeconds = (timestamp - state.autoRobotLastTime) / 1000;
   state.autoRobotLastTime = timestamp;
-  const pathLength = getAutoPathLength();
-  state.autoRobotDistance += AUTO_ROBOT_SPEED * elapsedSeconds;
 
-  if (state.autoRobotDistance >= pathLength) {
-    state.autoRobotDistance = pathLength;
+  Object.keys(AUTO_ROBOTS).forEach((robotId) => {
+    const pathLength = getAutoPathLength(robotId);
+    if (pathLength <= 0) return;
+    state.autoRobotDistances[robotId] = Math.min(
+      state.autoRobotDistances[robotId] + AUTO_ROBOT_SPEED * elapsedSeconds,
+      pathLength,
+    );
+  });
+
+  const allRobotsDone = Object.keys(AUTO_ROBOTS).every((robotId) => {
+    const pathLength = getAutoPathLength(robotId);
+    return pathLength <= 0 || state.autoRobotDistances[robotId] >= pathLength;
+  });
+
+  if (allRobotsDone) {
     state.autoRobotPlaying = false;
     state.autoRobotFrame = null;
     state.autoRobotLastTime = 0;
@@ -426,9 +465,19 @@ function stepAutoRobot(timestamp) {
   state.autoRobotFrame = requestAnimationFrame(stepAutoRobot);
 }
 
-function getAutoPathSegments() {
+function resetAutoRobotDistances() {
+  Object.keys(AUTO_ROBOTS).forEach((robotId) => {
+    state.autoRobotDistances[robotId] = 0;
+  });
+}
+
+function getAutoPathSegments(robotId) {
   const strokes = [...state.autoStrokes, state.autoCurrentStroke].filter(
-    (stroke) => stroke && stroke.tool === "draw" && stroke.points.length > 1,
+    (stroke) =>
+      stroke &&
+      stroke.tool === "draw" &&
+      (stroke.robot || "one") === robotId &&
+      stroke.points.length > 1,
   );
   const segments = [];
 
@@ -447,18 +496,18 @@ function getAutoPathSegments() {
   return segments;
 }
 
-function getAutoPathLength() {
-  return getAutoPathSegments().reduce((total, segment) => total + segment.length, 0);
+function getAutoPathLength(robotId) {
+  return getAutoPathSegments(robotId).reduce((total, segment) => total + segment.length, 0);
 }
 
-function getAutoRobotPose() {
-  const segments = getAutoPathSegments();
+function getAutoRobotPose(robotId) {
+  const segments = getAutoPathSegments(robotId);
 
   if (!segments.length) {
     return null;
   }
 
-  let remainingDistance = Math.min(state.autoRobotDistance, getAutoPathLength());
+  let remainingDistance = Math.min(state.autoRobotDistances[robotId], getAutoPathLength(robotId));
 
   for (const segment of segments) {
     if (remainingDistance <= segment.length) {
@@ -481,29 +530,31 @@ function getAutoRobotPose() {
   };
 }
 
-function drawAutoRobot(ctx) {
-  const pose = getAutoRobotPose();
+function drawAutoRobot(ctx, robotId) {
+  const pose = getAutoRobotPose(robotId);
 
   if (!pose) {
     return;
   }
+
+  const robot = AUTO_ROBOTS[robotId];
 
   ctx.save();
   ctx.translate(pose.x, pose.y);
   ctx.rotate(pose.angle);
   ctx.shadowColor = "rgba(0, 0, 0, 0.55)";
   ctx.shadowBlur = 24;
-  ctx.fillStyle = "rgba(25, 195, 125, 0.94)";
+  ctx.fillStyle = robot.color;
   ctx.strokeStyle = "#f6f7fb";
   ctx.lineWidth = 7;
   ctx.fillRect(-AUTO_ROBOT_SIZE / 2, -AUTO_ROBOT_SIZE / 2, AUTO_ROBOT_SIZE, AUTO_ROBOT_SIZE);
   ctx.strokeRect(-AUTO_ROBOT_SIZE / 2, -AUTO_ROBOT_SIZE / 2, AUTO_ROBOT_SIZE, AUTO_ROBOT_SIZE);
   ctx.shadowBlur = 0;
   ctx.fillStyle = "#06130d";
-  ctx.font = "900 22px Inter, sans-serif";
+  ctx.font = "900 18px Inter, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText("7305", 0, 0);
+  ctx.fillText(robot.label, 0, 0);
   ctx.restore();
 }
 
