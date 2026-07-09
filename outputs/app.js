@@ -1198,7 +1198,7 @@ function getClagueRating(rows) {
     record,
     stars: Math.round(ratingScore * 5),
     source: eventRatings.length
-      ? "FTCScout OPR + event rankings + teammate-adjusted wins"
+      ? "80% non-penalty OPR, 15% auto OPR, 5% win-rate"
       : "Match record",
   };
 }
@@ -1392,7 +1392,7 @@ function buildPickCandidate(eventKeyForPick, teamNumber, reports) {
     record: `${wins}-${losses}-${ties}`,
     winRate: Math.round(winRate * 100),
     pickScore,
-    source: Number.isFinite(opr) ? "OPR + rank + record" : "Rank + record",
+    source: Number.isFinite(opr) ? "Star formula + OPR + record" : "Star formula + record",
   };
 }
 
@@ -1647,51 +1647,58 @@ function buildEventTeamInsights() {
 
   state.eventTeamReports.forEach((reports, key) => {
     const rows = normalizeCollection(reports);
-    const oprValues = rows
+    const nonPenaltyOprValues = rows
       .map((report) => getOprValue(report))
       .filter((value) => Number.isFinite(value));
-    const minOpr = oprValues.length ? Math.min(...oprValues) : null;
-    const maxOpr = oprValues.length ? Math.max(...oprValues) : null;
+    const autoOprValues = rows
+      .map((report) => getAutoOprValue(report))
+      .filter((value) => Number.isFinite(value));
+    const winRateValues = rows
+      .map((report) => getReportWinRate(report))
+      .filter((value) => Number.isFinite(value));
     const teamCount = rows.length;
 
     rows.forEach((report) => {
       const teamNumber = report.teamNumber;
       const rank = Number(report?.stats?.rank);
       const opr = getOprValue(report);
+      const autoOpr = getAutoOprValue(report);
       const rankScore = Number.isFinite(rank) && teamCount > 1
         ? 1 - ((rank - 1) / (teamCount - 1))
         : null;
-      const oprScore = Number.isFinite(opr) && Number.isFinite(minOpr) && Number.isFinite(maxOpr) && maxOpr > minOpr
-        ? (opr - minOpr) / (maxOpr - minOpr)
-        : null;
+      const oprScore = percentileScore(opr, nonPenaltyOprValues);
+      const autoOprScore = percentileScore(autoOpr, autoOprValues);
       const wins = Number(report?.stats?.wins) || 0;
       const losses = Number(report?.stats?.losses) || 0;
       const ties = Number(report?.stats?.ties) || 0;
       const played = Number(report?.stats?.qualMatchesPlayed) || wins + losses + ties;
-      const winRate = played ? (wins + ties * 0.5) / played : null;
+      const winRate = getReportWinRate(report);
+      const winRateScore = percentileScore(winRate, winRateValues);
       const partnerAdjustedWinRate = getPartnerAdjustedWinRate(key, teamNumber, winRate);
       const ratingScore = weightedRatingScore([
-        { value: oprScore, weight: 0.45 },
-        { value: rankScore, weight: 0.35 },
-        { value: partnerAdjustedWinRate, weight: 0.2 },
+        { value: oprScore, weight: 0.8 },
+        { value: autoOprScore, weight: 0.15 },
+        { value: winRateScore, weight: 0.05 },
       ]);
 
       insights.set(teamStatsKey(key, teamNumber), {
         rank,
         opr,
-        autoOpr: Number(report?.stats?.opr?.autoPoints),
+        autoOpr,
         teleopOpr: Number(report?.stats?.opr?.dcPoints),
         wins,
         losses,
         ties,
         played,
         oprScore,
+        autoOprScore,
         rankScore,
         winRate,
+        winRateScore,
         partnerAdjustedWinRate,
         ratingScore,
         stars: Number.isFinite(ratingScore) ? Math.round(ratingScore * 5) : null,
-        source: "FTCScout OPR + event ranking + teammate-adjusted wins",
+        source: "80% non-penalty OPR, 15% auto OPR, 5% win-rate percentiles",
       });
     });
   });
@@ -1700,7 +1707,29 @@ function buildEventTeamInsights() {
 }
 
 function getOprValue(report) {
-  return Number(report?.stats?.opr?.totalPoints ?? report?.stats?.opr?.totalPointsNp);
+  return Number(report?.stats?.opr?.totalPointsNp ?? report?.stats?.opr?.totalPoints);
+}
+
+function getAutoOprValue(report) {
+  return Number(report?.stats?.opr?.autoPoints);
+}
+
+function getReportWinRate(report) {
+  const wins = Number(report?.stats?.wins) || 0;
+  const losses = Number(report?.stats?.losses) || 0;
+  const ties = Number(report?.stats?.ties) || 0;
+  const played = Number(report?.stats?.qualMatchesPlayed) || wins + losses + ties;
+
+  return played ? (wins + ties * 0.5) / played : null;
+}
+
+function percentileScore(value, values) {
+  if (!Number.isFinite(value) || !values.length) return null;
+  if (values.length === 1) return 1;
+
+  const sortedValues = [...values].sort((a, b) => a - b);
+  const belowOrEqual = sortedValues.filter((entry) => entry <= value).length;
+  return Math.max(0, Math.min(1, (belowOrEqual - 1) / (sortedValues.length - 1)));
 }
 
 function getReportTeamName(report) {
