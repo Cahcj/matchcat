@@ -24,12 +24,14 @@
       <nav class="app-sidebar__nav">
         <a href="#page-title" class="sidebar-link is-active">Dashboard</a>
         <button class="sidebar-link" id="picks-open" type="button">Picks</button>
+        <button class="sidebar-link" id="sim-open" type="button">Alliance Simulator</button>
         <button class="sidebar-link" id="auto-open" type="button">Auto Draw</button>
         <a href="#matches" class="sidebar-link">Past Matches</a>
       </nav>
     </aside>
     <div class="sidebar-backdrop" id="sidebar-backdrop" hidden></div>
     <div class="picks-backdrop" id="picks-backdrop" hidden></div>
+    <div class="sim-backdrop" id="sim-backdrop" hidden></div>
     <section class="picks-menu" id="picks-menu" aria-labelledby="picks-title" hidden>
       <div class="picks-menu__header">
         <div>
@@ -49,6 +51,29 @@
       <div class="status picks-menu__status" id="picks-status">Ranking teams from FTCScout data...</div>
       <div class="picks-list" id="picks-list">
         <div class="empty">Loading pick list...</div>
+      </div>
+    </section>
+    <section class="sim-menu" id="sim-menu" aria-labelledby="sim-title" hidden>
+      <div class="sim-menu__header">
+        <div>
+          <p class="section-kicker">Playoff Forecast</p>
+          <h2 id="sim-title">Alliance Simulator</h2>
+        </div>
+        <button class="button button--dark button--small" id="sim-close" type="button">Close</button>
+      </div>
+      <div class="sim-menu__controls">
+        <label>
+          Competition
+          <select id="sim-event-filter"></select>
+        </label>
+        <label>
+          Partner
+          <select id="sim-partner-filter"></select>
+        </label>
+      </div>
+      <div class="status sim-menu__status" id="sim-status">Pick a partner to simulate alliances.</div>
+      <div class="sim-list" id="sim-list">
+        <div class="empty">Loading simulator...</div>
       </div>
     </section>
     <div class="auto-backdrop" id="auto-backdrop" hidden></div>

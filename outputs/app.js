@@ -47,6 +47,8 @@ const state = {
   teamSeasonEventCache: new Map(),
   eventFilter: "all",
   picksEventFilter: "all",
+  simEventFilter: "",
+  simPartnerTeam: "",
   autoTool: "draw",
   autoSelectedRobot: "one",
   autoDrawing: false,
@@ -99,6 +101,14 @@ const els = {
   picksOpen: document.querySelector("#picks-open"),
   picksClose: document.querySelector("#picks-close"),
   picksBackdrop: document.querySelector("#picks-backdrop"),
+  simEventFilter: document.querySelector("#sim-event-filter"),
+  simPartnerFilter: document.querySelector("#sim-partner-filter"),
+  simList: document.querySelector("#sim-list"),
+  simStatus: document.querySelector("#sim-status"),
+  simMenu: document.querySelector("#sim-menu"),
+  simOpen: document.querySelector("#sim-open"),
+  simClose: document.querySelector("#sim-close"),
+  simBackdrop: document.querySelector("#sim-backdrop"),
   autoTeamMenu: document.querySelector("#auto-team-menu"),
   autoTeamForm: document.querySelector("#auto-team-form"),
   autoTeamInput: document.querySelector("#auto-team-input"),
@@ -173,6 +183,17 @@ els.picksEventFilter.addEventListener("change", () => {
   renderPicks();
 });
 
+els.simEventFilter.addEventListener("change", () => {
+  state.simEventFilter = els.simEventFilter.value;
+  populateSimulatorPartnerFilter();
+  renderAllianceSimulator();
+});
+
+els.simPartnerFilter.addEventListener("change", () => {
+  state.simPartnerTeam = els.simPartnerFilter.value;
+  renderAllianceSimulator();
+});
+
 els.teamDetailClose.addEventListener("click", () => {
   state.selectedTeam = null;
   renderTeamDetail();
@@ -191,6 +212,12 @@ els.picksOpen.addEventListener("click", (event) => {
 });
 els.picksClose.addEventListener("click", closePicksMenu);
 els.picksBackdrop.addEventListener("click", closePicksMenu);
+els.simOpen.addEventListener("click", (event) => {
+  event.preventDefault();
+  openSimulatorMenu();
+});
+els.simClose.addEventListener("click", closeSimulatorMenu);
+els.simBackdrop.addEventListener("click", closeSimulatorMenu);
 els.autoOpen.addEventListener("click", (event) => {
   event.preventDefault();
   openAutoTeamMenu();
@@ -240,6 +267,7 @@ document.querySelectorAll(".sidebar-link[href]").forEach((link) => {
       item.classList.toggle("is-active", item === link);
     });
     closePicksMenu();
+    closeSimulatorMenu();
     closeAutoMenu();
     closeSidebar();
   });
@@ -256,6 +284,7 @@ function openPicksMenu() {
     item.classList.toggle("is-active", item === els.picksOpen);
   });
   closeSidebar();
+  closeSimulatorMenu();
   closeAutoMenu();
   document.body.classList.add("picks-open");
   els.picksMenu.hidden = false;
@@ -270,12 +299,41 @@ function closePicksMenu() {
   els.picksBackdrop.hidden = true;
 }
 
+function openSimulatorMenu() {
+  document.querySelectorAll(".sidebar-link").forEach((item) => {
+    item.classList.toggle("is-active", item === els.simOpen);
+  });
+  closeSidebar();
+  closePicksMenu();
+  closeAutoMenu();
+
+  if (!state.simEventFilter) {
+    state.simEventFilter = getDefaultSimulatorEventKey();
+    els.simEventFilter.value = state.simEventFilter;
+    populateSimulatorPartnerFilter();
+  }
+
+  document.body.classList.add("sim-open");
+  els.simMenu.hidden = false;
+  els.simMenu.removeAttribute("hidden");
+  els.simBackdrop.hidden = false;
+  els.simBackdrop.removeAttribute("hidden");
+  renderAllianceSimulator();
+}
+
+function closeSimulatorMenu() {
+  document.body.classList.remove("sim-open");
+  els.simMenu.hidden = true;
+  els.simBackdrop.hidden = true;
+}
+
 function openAutoMenu() {
   document.querySelectorAll(".sidebar-link").forEach((item) => {
     item.classList.toggle("is-active", item === els.autoOpen);
   });
   closeSidebar();
   closePicksMenu();
+  closeSimulatorMenu();
   closeAutoTeamMenu();
   document.body.classList.add("auto-open");
   els.autoMenu.hidden = false;
@@ -292,6 +350,7 @@ function openAutoTeamMenu() {
   });
   closeSidebar();
   closePicksMenu();
+  closeSimulatorMenu();
   stopAutoPath();
   document.body.classList.add("auto-open");
   els.autoMenu.hidden = true;
@@ -1015,6 +1074,7 @@ document.addEventListener("click", (event) => {
   if (!teamButton) return;
 
   closePicksMenu();
+  closeSimulatorMenu();
   closeAutoMenu();
   openTeamDetail(Number(teamButton.dataset.teamNumber), teamButton.dataset.eventKey);
 });
@@ -1034,6 +1094,8 @@ async function loadTracker() {
   state.teamSeasonEventCache = new Map();
   state.eventFilter = "all";
   state.picksEventFilter = "all";
+  state.simEventFilter = "";
+  state.simPartnerTeam = "";
   state.selectedTeam = null;
   els.eventFilter.value = "all";
   els.picksEventFilter.value = "all";
@@ -1054,6 +1116,8 @@ async function loadTracker() {
     await loadOpponentTeamNames();
     populateEventFilter();
     populatePicksEventFilter();
+    populateSimulatorEventFilter();
+    populateSimulatorPartnerFilter();
     render();
     setStatus(`Updated from FTCScout for ${getSeasonLabel(state.year)}.`);
   } catch (error) {
@@ -1061,6 +1125,8 @@ async function loadTracker() {
     setStatus("FTCScout data could not load right now.");
     els.picksStatus.textContent = "No pick data loaded.";
     els.picksList.innerHTML = `<div class="empty">No pick data returned for this team and season.</div>`;
+    els.simStatus.textContent = "No simulator data loaded.";
+    els.simList.innerHTML = `<div class="empty">No simulator data returned for this team and season.</div>`;
     els.matchBody.innerHTML = `<tr><td colspan="8" class="empty">No live data returned for this team and season.</td></tr>`;
   }
 }
@@ -1181,6 +1247,40 @@ function populatePicksEventFilter() {
   });
 }
 
+function populateSimulatorEventFilter() {
+  const events = getLoadedEvents();
+  state.simEventFilter = state.eventFilter !== "all" && events.some((event) => event.key === state.eventFilter)
+    ? state.eventFilter
+    : getDefaultSimulatorEventKey(events);
+  els.simEventFilter.innerHTML = events.map((event) => {
+    const selected = event.key === state.simEventFilter ? " selected" : "";
+    return `<option value="${escapeHtml(event.key)}"${selected}>${escapeHtml(event.name)}</option>`;
+  }).join("");
+}
+
+function populateSimulatorPartnerFilter() {
+  const partners = getSimulatorPartners(state.simEventFilter);
+
+  if (!partners.length) {
+    state.simPartnerTeam = "";
+    els.simPartnerFilter.innerHTML = `<option value="">No ranked teams found</option>`;
+    return;
+  }
+
+  if (!partners.some((partner) => String(partner.teamNumber) === String(state.simPartnerTeam))) {
+    state.simPartnerTeam = String(partners[0].teamNumber);
+  }
+
+  els.simPartnerFilter.innerHTML = partners.map((partner) => {
+    const selected = String(partner.teamNumber) === String(state.simPartnerTeam) ? " selected" : "";
+    return `<option value="${partner.teamNumber}"${selected}>#${partner.teamNumber} ${escapeHtml(partner.name)}</option>`;
+  }).join("");
+}
+
+function getDefaultSimulatorEventKey(events = getLoadedEvents()) {
+  return [...events].sort((a, b) => eventSortTime(b.key) - eventSortTime(a.key))[0]?.key || "";
+}
+
 function getLoadedEvents() {
   return [...new Map(
     state.participation.map((match) => {
@@ -1204,6 +1304,7 @@ function render() {
   renderUpcomingMatch(upcomingMatch);
   renderTeamDetail();
   renderPicks();
+  renderAllianceSimulator();
   renderMatches(pastRows);
 }
 
@@ -1597,6 +1698,166 @@ function buildPickCandidate(eventKeyForPick, teamNumber, reports) {
     pickScore,
     source: Number.isFinite(opr) ? "Star formula + OPR + record" : "Star formula + record",
   };
+}
+
+function renderAllianceSimulator() {
+  if (!els.simList) return;
+
+  const result = getAllianceSimulation();
+  const scope = state.simEventFilter ? eventDisplayName(state.simEventFilter) : getSeasonLabel(state.year);
+
+  if (!result.partner) {
+    els.simStatus.textContent = `No partner options found for ${scope}.`;
+    els.simList.innerHTML = `<div class="empty">Choose a competition with team ranking data first.</div>`;
+    return;
+  }
+
+  els.simStatus.textContent = result.beatingAlliances.length
+    ? `${result.beatingAlliances.length} alliance combo${result.beatingAlliances.length === 1 ? "" : "s"} project above 7305 + ${result.partner.teamNumber} at ${scope}.`
+    : `7305 + ${result.partner.teamNumber} projects above every other two-team alliance at ${scope}.`;
+
+  const threatRows = result.beatingAlliances.length
+    ? result.beatingAlliances.slice(0, 12).map((alliance, index) => `
+        <article class="sim-card">
+          <div class="sim-card__rank">#${index + 1}</div>
+          <div class="sim-card__main">
+            <div class="sim-card__teams">
+              ${formatSimulatorTeamButton(alliance.teams[0], state.simEventFilter)}
+              <span>+</span>
+              ${formatSimulatorTeamButton(alliance.teams[1], state.simEventFilter)}
+            </div>
+            <div class="pick-card__meta">Projected edge +${Math.round((alliance.score - result.ourAlliance.score) * 100)} / ${starRating(Math.round(alliance.score * 5)) || "0 stars"}</div>
+          </div>
+          <div class="pick-card__stats">
+            <span>Score <strong>${Math.round(alliance.score * 100)}</strong></span>
+            <span>OPR <strong>${formatAllianceOpr(alliance)}</strong></span>
+            <span>Ranks <strong>${formatAllianceRanks(alliance)}</strong></span>
+          </div>
+        </article>
+      `).join("")
+    : `<div class="empty">No alliance combo projects above your pick.</div>`;
+
+  els.simList.innerHTML = `
+    <article class="sim-summary-card">
+      <div>
+        <span>Your alliance</span>
+        <strong>7305 + ${result.partner.teamNumber}</strong>
+        <small>${escapeHtml(result.partner.name)} / ${starRating(Math.round(result.ourAlliance.score * 5)) || "0 stars"}</small>
+      </div>
+      <div class="pick-card__stats">
+        <span>Score <strong>${Math.round(result.ourAlliance.score * 100)}</strong></span>
+        <span>OPR <strong>${formatAllianceOpr(result.ourAlliance)}</strong></span>
+        <span>Rank <strong>${Number.isFinite(result.partner.rank) ? result.partner.rank : "--"}</strong></span>
+      </div>
+    </article>
+    ${threatRows}
+  `;
+}
+
+function getAllianceSimulation() {
+  const eventKeyForSim = state.simEventFilter;
+  const candidates = getSimulatorPartners(eventKeyForSim);
+  const clague = getSimulatorTeam(eventKeyForSim, TEAM_NUMBER);
+  const partner = candidates.find((candidate) => String(candidate.teamNumber) === String(state.simPartnerTeam))
+    ?? candidates[0]
+    ?? null;
+
+  if (!eventKeyForSim || !clague || !partner) {
+    return { partner: null, ourAlliance: null, beatingAlliances: [] };
+  }
+
+  const ourAlliance = buildSimAlliance([clague, partner]);
+  const opponentPool = candidates.filter((candidate) => candidate.teamNumber !== partner.teamNumber);
+  const beatingAlliances = [];
+
+  for (let firstIndex = 0; firstIndex < opponentPool.length; firstIndex += 1) {
+    for (let secondIndex = firstIndex + 1; secondIndex < opponentPool.length; secondIndex += 1) {
+      const alliance = buildSimAlliance([opponentPool[firstIndex], opponentPool[secondIndex]]);
+
+      if (alliance.score > ourAlliance.score) {
+        beatingAlliances.push(alliance);
+      }
+    }
+  }
+
+  beatingAlliances.sort((a, b) =>
+    b.score - a.score ||
+    Number(b.oprTotal) - Number(a.oprTotal),
+  );
+
+  return { partner, ourAlliance, beatingAlliances };
+}
+
+function getSimulatorPartners(eventKeyForSim) {
+  if (!eventKeyForSim) return [];
+
+  const reports = normalizeCollection(state.eventTeamReports.get(eventKeyForSim));
+  const teamNumbers = new Set(reports.map((report) => Number(report?.teamNumber)).filter(Number.isFinite));
+
+  state.teamEventStats.forEach((stats) => {
+    if (stats.eventKey === eventKeyForSim) teamNumbers.add(stats.teamNumber);
+  });
+
+  return [...teamNumbers]
+    .filter((teamNumber) => teamNumber !== TEAM_NUMBER)
+    .map((teamNumber) => getSimulatorTeam(eventKeyForSim, teamNumber))
+    .filter(Boolean)
+    .sort((a, b) =>
+      b.pickScore - a.pickScore ||
+      (b.opr ?? 0) - (a.opr ?? 0) ||
+      (a.rank ?? Number.POSITIVE_INFINITY) - (b.rank ?? Number.POSITIVE_INFINITY),
+    );
+}
+
+function getSimulatorTeam(eventKeyForSim, teamNumber) {
+  const reports = normalizeCollection(state.eventTeamReports.get(eventKeyForSim));
+  return buildPickCandidate(eventKeyForSim, teamNumber, reports);
+}
+
+function buildSimAlliance(teams) {
+  const score = weightedRatingScore([
+    { value: averageFinite(teams.map((team) => team.pickScore)), weight: 0.68 },
+    { value: Math.min(1, sumFinite(teams.map((team) => team.opr)) / 220), weight: 0.22 },
+    { value: averageFinite(teams.map((team) => Number.isFinite(team.rank) ? 1 / Math.max(team.rank, 1) : null)), weight: 0.1 },
+  ]);
+
+  return {
+    teams,
+    score: Number.isFinite(score) ? score : 0,
+    oprTotal: sumFinite(teams.map((team) => team.opr)),
+  };
+}
+
+function averageFinite(values) {
+  const finiteValues = values.filter(Number.isFinite);
+  return finiteValues.length
+    ? finiteValues.reduce((sum, value) => sum + value, 0) / finiteValues.length
+    : null;
+}
+
+function sumFinite(values) {
+  return values.filter(Number.isFinite).reduce((sum, value) => sum + value, 0);
+}
+
+function formatSimulatorTeamButton(team, eventKeyForSim) {
+  return `
+    <button class="team-link sim-team-link" type="button" data-team-number="${team.teamNumber}" data-event-key="${escapeHtml(eventKeyForSim)}">
+      <span>${team.teamNumber}</span>
+      ${escapeHtml(team.name)}
+    </button>
+  `;
+}
+
+function formatAllianceOpr(alliance) {
+  return alliance.teams
+    .map((team) => Number.isFinite(team.opr) ? team.opr.toFixed(1) : "--")
+    .join(" + ");
+}
+
+function formatAllianceRanks(alliance) {
+  return alliance.teams
+    .map((team) => Number.isFinite(team.rank) ? `#${team.rank}` : "--")
+    .join(" + ");
 }
 
 async function openTeamDetail(teamNumber, eventKeyForCard) {
