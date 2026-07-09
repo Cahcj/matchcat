@@ -273,6 +273,12 @@ function getRows() {
         .filter((teamNumber) => teamNumber !== state.team)
         .map((teamNumber) => getTeamRating(teamNumber, entry));
       const opponents = opponentTeams.map((teamNumber) => getTeamRating(teamNumber, entry));
+      const redTeams = teams
+        .filter((team) => team.alliance === "Red")
+        .map((team) => getTeamRating(team.teamNumber, entry));
+      const blueTeams = teams
+        .filter((team) => team.alliance === "Blue")
+        .map((team) => getTeamRating(team.teamNumber, entry));
 
       return {
         ...entry,
@@ -281,6 +287,8 @@ function getRows() {
         eventName: eventName(entry),
         partners,
         opponents,
+        redTeams,
+        blueTeams,
         redScore,
         blueScore,
         myScore,
@@ -398,10 +406,11 @@ function renderMatches(rows) {
     return `
       <tr>
         <td data-label="Match">
-          <div class="match-title">
+          <div class="match-title match-title--desktop">
             <strong>${formatMatchName(row)}</strong>
             <span>${row.tournamentLevel}</span>
           </div>
+          ${formatMobileMatchCard(row)}
         </td>
         <td data-label="Competition">${escapeHtml(row.eventName)}</td>
         <td data-label="Alliance"><span class="pill ${allianceClass}">${row.alliance} ${row.station}</span></td>
@@ -960,6 +969,69 @@ function formatTeamRatings(teams) {
       }).join("")}
     </div>
   `;
+}
+
+function formatMobileMatchCard(row) {
+  const scoreLabel = Number.isFinite(row.redScore) && Number.isFinite(row.blueScore)
+    ? `${row.redScore} - ${row.blueScore}`
+    : "Pending";
+  const resultLabel = row.result === "Pending" || row.result === "No score"
+    ? row.result
+    : `${row.result} for 7305`;
+
+  return `
+    <article class="mobile-match-card" aria-label="${escapeHtml(formatMatchName(row))} alliance matchup">
+      <header class="mobile-match-card__header">
+        <div>
+          <strong>${formatMatchName(row)}</strong>
+          <span>${escapeHtml(row.eventName)}</span>
+        </div>
+        <span class="mobile-match-card__result ${resultClass(row.result)}">${resultLabel}</span>
+      </header>
+      <div class="mobile-match-board">
+        <div class="mobile-match-board__head mobile-match-board__head--match">Match</div>
+        <div class="mobile-match-board__head mobile-match-board__head--red">Red Alliance</div>
+        <div class="mobile-match-board__head mobile-match-board__head--blue">Blue Alliance</div>
+        <div class="mobile-match-board__score">
+          <strong>${scoreLabel}</strong>
+          <span>${formatDate(row.scheduledStartTime)}</span>
+        </div>
+        <div class="mobile-alliance mobile-alliance--red">
+          ${formatMobileAllianceTeams(row.redTeams)}
+        </div>
+        <div class="mobile-alliance mobile-alliance--blue">
+          ${formatMobileAllianceTeams(row.blueTeams)}
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function formatMobileAllianceTeams(teams) {
+  if (!teams.length) return `<div class="mobile-team mobile-team--empty">TBD</div>`;
+
+  return teams.map(({ teamNumber, name, eventKey, stats, rank, sourceEventName, isFallback }) => {
+    const record = stats ? `${stats.wins}-${stats.losses}-${stats.ties}` : "0-0-0";
+    const stars = stats ? stats.stars : 0;
+    const rankLabel = Number.isFinite(rank) ? `Rank ${rank}` : "Rank --";
+    const oprLabel = Number.isFinite(stats?.opr) ? `OPR ${stats.opr.toFixed(1)}` : "OPR --";
+    const clagueClass = teamNumber === TEAM_NUMBER ? " mobile-team--clague" : "";
+    const sourceLabel = isFallback && sourceEventName
+      ? `<small>Stars from ${escapeHtml(sourceEventName)}</small>`
+      : "";
+
+    return `
+      <div class="mobile-team${clagueClass}">
+        <button class="team-link mobile-team__name" type="button" data-team-number="${teamNumber}" data-event-key="${escapeHtml(eventKey)}">
+          <span>${teamNumber}</span>
+          ${escapeHtml(name)}
+        </button>
+        <div class="mobile-team__meta">${rankLabel} / ${record} / ${oprLabel}</div>
+        <div class="stars" aria-label="${stars} out of 5 stars">${starRating(stars)}</div>
+        ${sourceLabel}
+      </div>
+    `;
+  }).join("");
 }
 
 function starRating(stars) {
