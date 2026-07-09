@@ -397,19 +397,19 @@ function renderMatches(rows) {
 
     return `
       <tr>
-        <td>
+        <td data-label="Match">
           <div class="match-title">
             <strong>${formatMatchName(row)}</strong>
             <span>${row.tournamentLevel}</span>
           </div>
         </td>
-        <td>${escapeHtml(row.eventName)}</td>
-        <td><span class="pill ${allianceClass}">${row.alliance} ${row.station}</span></td>
-        <td>${formatTeamRatings(row.partners)}</td>
-        <td>${formatTeamRatings(row.opponents)}</td>
-        <td>${formatScore(row)}</td>
-        <td class="${resultClass(row.result)}">${row.result}</td>
-        <td>${formatDate(row.scheduledStartTime)}</td>
+        <td data-label="Competition">${escapeHtml(row.eventName)}</td>
+        <td data-label="Alliance"><span class="pill ${allianceClass}">${row.alliance} ${row.station}</span></td>
+        <td data-label="Teammates">${formatTeamRatings(row.partners)}</td>
+        <td data-label="Opponents">${formatTeamRatings(row.opponents)}</td>
+        <td data-label="Score">${formatScore(row)}</td>
+        <td data-label="Result" class="${resultClass(row.result)}">${row.result}</td>
+        <td data-label="Time">${formatDate(row.scheduledStartTime)}</td>
       </tr>
     `;
   }).join("");
@@ -534,13 +534,13 @@ function renderTeamDetail() {
   const rankRows = rows.length
     ? rows.map((row) => `
         <tr>
-          <td>${escapeHtml(row.eventName)}</td>
-          <td>${Number.isFinite(row.rank) ? row.rank : "--"}</td>
-          <td>${Number.isFinite(row.opr) ? row.opr.toFixed(1) : "--"}</td>
-          <td>${Number.isFinite(row.autoOpr) ? row.autoOpr.toFixed(1) : "--"}</td>
-          <td>${Number.isFinite(row.teleopOpr) ? row.teleopOpr.toFixed(1) : "--"}</td>
-          <td>${row.record}</td>
-          <td><span class="stars">${starRating(row.stars) || "0 stars"}</span></td>
+          <td data-label="Competition">${escapeHtml(row.eventName)}</td>
+          <td data-label="Rank">${Number.isFinite(row.rank) ? row.rank : "--"}</td>
+          <td data-label="OPR">${Number.isFinite(row.opr) ? row.opr.toFixed(1) : "--"}</td>
+          <td data-label="Auto OPR">${Number.isFinite(row.autoOpr) ? row.autoOpr.toFixed(1) : "--"}</td>
+          <td data-label="Teleop OPR">${Number.isFinite(row.teleopOpr) ? row.teleopOpr.toFixed(1) : "--"}</td>
+          <td data-label="Record">${row.record}</td>
+          <td data-label="Stars"><span class="stars">${starRating(row.stars) || "0 stars"}</span></td>
         </tr>
       `).join("")
     : `<tr><td colspan="7" class="empty">No past competition ranking data found for this team.</td></tr>`;
