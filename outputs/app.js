@@ -70,6 +70,7 @@ const state = {
   autoAddedDate: "",
   autoMotorRpm: "312rpm",
   autoRobotPhoto: "",
+  autoNotes: "",
   selectedTeam: null,
 };
 
@@ -128,6 +129,7 @@ const els = {
   autoPhotoPreview: document.querySelector("#auto-photo-preview"),
   autoPhotoImg: document.querySelector("#auto-photo-img"),
   autoPhotoClear: document.querySelector("#auto-photo-clear"),
+  autoNotesInput: document.querySelector("#auto-notes-input"),
   autoTeamTest: document.querySelector("#auto-team-test"),
   autoTeamStatus: document.querySelector("#auto-team-status"),
   autoMenu: document.querySelector("#auto-menu"),
@@ -258,6 +260,7 @@ els.autoTeamForm.addEventListener("submit", (event) => {
 });
 els.autoTeamInput.addEventListener("input", syncAutoPromptPhoto);
 els.autoGameInput.addEventListener("change", syncAutoPromptPhoto);
+els.autoNotesInput.addEventListener("input", handleAutoNotesInput);
 els.autoTeamTest.addEventListener("click", () => {
   els.autoTeamInput.value = "Test Team";
   syncAutoPromptPhoto();
@@ -417,7 +420,7 @@ function openAutoTeamMenu() {
   els.autoDateInput.value = state.autoAddedDate || getTodayDateString();
   els.autoRpmInput.value = state.autoMotorRpm || "312rpm";
   els.autoPhotoInput.value = "";
-  syncAutoPromptPhoto();
+  syncAutoPromptDetails();
   els.autoTeamStatus.textContent = getAutoTeamPromptStatus();
   setTimeout(() => els.autoTeamInput.focus(), 0);
 }
@@ -445,6 +448,7 @@ function startAutoForTypedTeam() {
   const gameKey = els.autoGameInput.value || getDefaultAutoGameKey();
   const addedDate = els.autoDateInput.value || getTodayDateString();
   const motorRpm = els.autoRpmInput.value || "312rpm";
+  const notes = els.autoNotesInput.value.trim();
 
   if (!label) {
     els.autoTeamStatus.textContent = "Type a team number or team name first.";
@@ -456,8 +460,19 @@ function startAutoForTypedTeam() {
     return;
   }
 
-  loadAutoDrawingForTeam(label, gameKey, addedDate, motorRpm, state.autoRobotPhoto);
+  loadAutoDrawingForTeam(label, gameKey, addedDate, motorRpm, state.autoRobotPhoto, notes);
   openAutoMenu();
+}
+
+function handleAutoNotesInput() {
+  state.autoNotes = els.autoNotesInput.value;
+  const promptTeamKey = getAutoTeamKey(els.autoTeamInput.value);
+  const promptGameKey = els.autoGameInput.value || getDefaultAutoGameKey();
+
+  if (state.autoTeamKey && promptTeamKey === state.autoTeamKey && promptGameKey === state.autoGameKey) {
+    saveAutoDrawing({ silent: true });
+    els.autoSaveStatus.textContent = `Notes saved for ${state.autoTeamLabel}.`;
+  }
 }
 
 async function handleAutoPhotoInput(event) {
@@ -500,10 +515,16 @@ function clearAutoPhoto() {
 }
 
 function syncAutoPromptPhoto() {
+  syncAutoPromptDetails();
+}
+
+function syncAutoPromptDetails() {
   const promptTeamKey = getAutoTeamKey(els.autoTeamInput.value);
   const promptGameKey = els.autoGameInput.value || getDefaultAutoGameKey();
   const savedAuto = getAutoStorage()[promptTeamKey]?.autos?.[promptGameKey];
   state.autoRobotPhoto = safeAutoPhotoSrc(savedAuto?.robotPhoto);
+  state.autoNotes = savedAuto?.notes || "";
+  els.autoNotesInput.value = state.autoNotes;
   renderAutoPhotoPreview();
 }
 
@@ -662,7 +683,7 @@ function getAutoTeamPromptStatus() {
   );
   return savedCount
     ? `${savedCount} saved ScoutingForm${savedCount === 1 ? "" : "s"} on this device.`
-    : "Saved drawings stay on this device.";
+    : "Saved ScoutingForms stay on this device.";
 }
 
 function renderAutoGameOptions() {
@@ -697,6 +718,7 @@ function normalizeAutoTeamRecord(teamKey, record) {
       autos[gameKey] = {
         ...autoRecord,
         robotPhoto: safeAutoPhotoSrc(autoRecord?.robotPhoto),
+        notes: autoRecord?.notes || "",
       };
     });
 
@@ -719,6 +741,7 @@ function normalizeAutoTeamRecord(teamKey, record) {
           addedDate: record.addedDate || record.updatedAt?.slice(0, 10) || getTodayDateString(),
           motorRpm: record.motorRpm || "312rpm",
           robotPhoto: safeAutoPhotoSrc(record.robotPhoto),
+          notes: record.notes || "",
           updatedAt: record.updatedAt || "",
           strokes: record.strokes,
         },
@@ -739,6 +762,7 @@ function loadAutoDrawingForTeam(
   addedDate = getTodayDateString(),
   motorRpm = "312rpm",
   robotPhoto = "",
+  notes = "",
 ) {
   const key = getAutoTeamKey(label);
   const storage = getAutoStorage();
@@ -752,6 +776,7 @@ function loadAutoDrawingForTeam(
   state.autoAddedDate = savedAuto?.addedDate || addedDate;
   state.autoMotorRpm = savedAuto?.motorRpm || motorRpm;
   state.autoRobotPhoto = safeAutoPhotoSrc(robotPhoto) || safeAutoPhotoSrc(savedAuto?.robotPhoto);
+  state.autoNotes = notes || savedAuto?.notes || "";
   state.autoStrokes = Array.isArray(savedAuto?.strokes) ? savedAuto.strokes : [];
   state.autoCurrentStroke = null;
   state.autoDrawing = false;
@@ -785,6 +810,7 @@ function saveAutoDrawing(options = {}) {
     addedDate: state.autoAddedDate || getTodayDateString(),
     motorRpm: state.autoMotorRpm || "312rpm",
     robotPhoto: safeAutoPhotoSrc(state.autoRobotPhoto),
+    notes: state.autoNotes || "",
     updatedAt: new Date().toISOString(),
     strokes: state.autoStrokes,
   };
@@ -833,6 +859,7 @@ function openSavedAuto(teamKey, gameKey) {
   state.autoAddedDate = autoRecord.addedDate || getTodayDateString();
   state.autoMotorRpm = autoRecord.motorRpm || "312rpm";
   state.autoRobotPhoto = safeAutoPhotoSrc(autoRecord.robotPhoto);
+  state.autoNotes = autoRecord.notes || "";
   state.autoStrokes = Array.isArray(autoRecord.strokes) ? autoRecord.strokes : [];
   state.autoCurrentStroke = null;
   state.autoDrawing = false;
@@ -858,6 +885,7 @@ function deleteSavedAuto(teamKey, gameKey) {
   if (state.autoTeamKey === teamKey && state.autoGameKey === gameKey) {
     state.autoStrokes = [];
     state.autoRobotPhoto = "";
+    state.autoNotes = "";
     state.autoCurrentStroke = null;
     resetAutoRobotDistances();
     renderAutoPhotoPreview();
@@ -2124,6 +2152,7 @@ function renderTeamDetail() {
             <span>${escapeHtml(autoRecord.gameLabel || getAutoGameLabel(autoRecord.gameKey))}</span>
             <strong>${escapeHtml(autoRecord.addedDate || "No date")}</strong>
             <small>${escapeHtml(autoRecord.label)} ScoutingForm${autoRecord.motorRpm ? ` / ${escapeHtml(autoRecord.motorRpm)}` : ""}</small>
+            ${autoRecord.notes ? `<p class="team-auto-card__notes">${escapeHtml(autoRecord.notes)}</p>` : ""}
           </div>
           <div class="team-auto-card__actions">
             <button class="button button--small auto-view-button" type="button" data-team-key="${escapeHtml(autoRecord.teamKey)}" data-game-key="${escapeHtml(autoRecord.gameKey)}">View Form</button>

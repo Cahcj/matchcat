@@ -172,7 +172,8 @@ main {
 }
 
 .auto-team-card input,
-.auto-team-card select {
+.auto-team-card select,
+.auto-team-card textarea {
   width: 100%;
   min-height: 46px;
   border: 1px solid var(--line);
@@ -184,8 +185,16 @@ main {
   padding: 0 12px;
 }
 
+.auto-team-card textarea {
+  min-height: 96px;
+  resize: vertical;
+  line-height: 1.35;
+  padding: 12px;
+}
+
 .auto-team-card input:focus,
-.auto-team-card select:focus {
+.auto-team-card select:focus,
+.auto-team-card textarea:focus {
   border-color: rgba(25, 195, 125, 0.56);
   outline: none;
 }
@@ -1003,6 +1012,16 @@ td {
 .team-auto-card strong {
   color: var(--ink);
   font-size: 1rem;
+}
+
+.team-auto-card__notes {
+  max-width: 62ch;
+  margin: 4px 0 0;
+  color: var(--ink);
+  font-size: 0.82rem;
+  font-weight: 750;
+  line-height: 1.35;
+  white-space: pre-wrap;
 }
 
 .team-auto-card__actions {
