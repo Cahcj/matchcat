@@ -2,6 +2,9 @@ const API_ROOT = "https://api.ftcscout.org/rest/v1";
 const TEAM_NUMBER = 7305;
 const AUTO_FIELD_IMAGE_SRC = "auto-field.png";
 const AUTO_STORAGE_KEY = "matchcat:auto-drawings:v1";
+const DATA_CACHE_NAME = "matchcat-api-cache-v1";
+const DATA_CACHE_META_KEY = "matchcat:data-cache-meta:v1";
+const OFFLINE_REFRESH_DELAY = 900;
 const AUTO_ROBOT_SIZE = 78;
 const AUTO_ROBOT_SPEED = 430;
 const AUTO_ROBOTS = {
@@ -46,6 +49,10 @@ const state = {
   teamNames: new Map(),
   teamProfiles: new Map(),
   teamSeasonEventCache: new Map(),
+  dataSource: navigator.onLine ? "live" : "offline",
+  usedCachedData: false,
+  lastSyncAt: "",
+  reconnectTimer: null,
   eventFilter: "all",
   picksEventFilter: "all",
   rankingEventFilter: "",
@@ -96,6 +103,7 @@ const els = {
   avgScore: document.querySelector("#avg-score"),
   latestMatch: document.querySelector("#latest-match"),
   latestEvent: document.querySelector("#latest-event"),
+  dataStatus: document.querySelector("#data-status"),
   upcomingCard: document.querySelector("#upcoming-card"),
   matchBody: document.querySelector("#match-body"),
   picksList: document.querySelector("#picks-list"),
@@ -166,6 +174,9 @@ els.form.addEventListener("submit", (event) => {
   event.preventDefault();
   refreshSelectedYear();
 });
+
+registerServiceWorker();
+setupConnectivityListeners();
 
 els.yearInput.addEventListener("change", () => {
   refreshSelectedYear();
@@ -283,6 +294,34 @@ els.autoCanvas.addEventListener("pointermove", continueAutoStroke);
 els.autoCanvas.addEventListener("pointerup", endAutoStroke);
 els.autoCanvas.addEventListener("pointercancel", endAutoStroke);
 els.autoCanvas.addEventListener("pointerleave", endAutoStroke);
+
+function registerServiceWorker() {
+  if (!("serviceWorker" in navigator)) return;
+
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch((error) => {
+      console.warn("MatchCat offline worker could not register.", error);
+    });
+  });
+}
+
+function setupConnectivityListeners() {
+  updateDataStatus(navigator.onLine ? "Checking live data..." : "Offline mode: using saved MatchCat data when available.");
+
+  window.addEventListener("online", () => {
+    state.dataSource = "live";
+    updateDataStatus("Back online. Refreshing FTCScout and Orange Alliance data...");
+    window.clearTimeout(state.reconnectTimer);
+    state.reconnectTimer = window.setTimeout(() => {
+      loadTracker();
+    }, OFFLINE_REFRESH_DELAY);
+  });
+
+  window.addEventListener("offline", () => {
+    state.dataSource = "offline";
+    updateDataStatus("Offline mode: MatchCat will use saved FTCScout and Orange Alliance data.");
+  });
+}
 
 document.querySelectorAll(".sidebar-link[href]").forEach((link) => {
   link.addEventListener("click", () => {
@@ -1166,6 +1205,7 @@ loadTracker();
 
 async function loadTracker() {
   setLoading();
+  state.usedCachedData = false;
   state.details = new Map();
   state.events = new Map();
   state.eventTeamReports = new Map();
@@ -1204,10 +1244,21 @@ async function loadTracker() {
     populateSimulatorEventFilter();
     populateSimulatorPartnerFilter();
     render();
-    setStatus(`Updated from FTCScout for ${getSeasonLabel(state.year)}.`);
+    state.dataSource = state.usedCachedData ? "cached" : "live";
+    state.lastSyncAt = new Date().toISOString();
+    setStatus(state.usedCachedData
+      ? `Loaded saved FTCScout data for ${getSeasonLabel(state.year)}.`
+      : `Updated from FTCScout for ${getSeasonLabel(state.year)}.`);
+    updateDataStatus(state.usedCachedData
+      ? `Offline-ready: showing last saved FTCScout/Orange Alliance data for ${getSeasonLabel(state.year)}.`
+      : `Live data loaded. Offline copy saved for ${getSeasonLabel(state.year)}.`);
   } catch (error) {
     console.error(error);
+    state.dataSource = navigator.onLine ? "error" : "offline";
     setStatus("FTCScout data could not load right now.");
+    updateDataStatus(navigator.onLine
+      ? "Live data is having trouble and no saved copy was found for this season."
+      : "Offline with no saved copy for this season yet. Open MatchCat online once to save it.");
     els.picksStatus.textContent = "No pick data loaded.";
     els.picksList.innerHTML = `<div class="empty">No pick data returned for this team and season.</div>`;
     els.rankingStatus.textContent = "No ranking data loaded.";
@@ -1311,11 +1362,61 @@ async function loadOpponentTeamNames() {
 }
 
 async function getJson(url) {
-  const response = await fetch(url, { headers: { accept: "application/json" } });
-  if (!response.ok) {
-    throw new Error(`${response.status} ${response.statusText}`);
+  const request = new Request(url, { headers: { accept: "application/json" } });
+
+  try {
+    const response = await fetch(request);
+    if (!response.ok) {
+      throw new Error(`${response.status} ${response.statusText}`);
+    }
+
+    await cacheApiResponse(request, response.clone());
+    rememberCachedUrl(url);
+    return response.json();
+  } catch (error) {
+    const cached = await getCachedApiResponse(request);
+
+    if (cached) {
+      state.usedCachedData = true;
+      return cached.json();
+    }
+
+    throw error;
   }
-  return response.json();
+}
+
+async function cacheApiResponse(request, response) {
+  if (!("caches" in window)) return;
+
+  try {
+    const cache = await caches.open(DATA_CACHE_NAME);
+    await cache.put(request, response);
+  } catch (error) {
+    console.warn("Could not save MatchCat API cache.", error);
+  }
+}
+
+async function getCachedApiResponse(request) {
+  if (!("caches" in window)) return null;
+
+  try {
+    const cache = await caches.open(DATA_CACHE_NAME);
+    const cached = await cache.match(request);
+    return cached || null;
+  } catch (error) {
+    console.warn("Could not read MatchCat API cache.", error);
+    return null;
+  }
+}
+
+function rememberCachedUrl(url) {
+  try {
+    const meta = JSON.parse(localStorage.getItem(DATA_CACHE_META_KEY) || "{}");
+    meta[url] = new Date().toISOString();
+    localStorage.setItem(DATA_CACHE_META_KEY, JSON.stringify(meta));
+  } catch (error) {
+    console.warn("Could not update MatchCat cache metadata.", error);
+  }
 }
 
 function normalizeCollection(response) {
@@ -2835,8 +2936,23 @@ function setLoading() {
   els.picksList.innerHTML = `<div class="empty">Loading pick list...</div>`;
   els.matchBody.innerHTML = `<tr><td colspan="8" class="empty">Loading matches from FTCScout...</td></tr>`;
   setStatus("Loading FTCScout data...");
+  updateDataStatus(navigator.onLine
+    ? "Checking FTCScout and Orange Alliance data..."
+    : "Offline mode: looking for saved MatchCat data.");
 }
 
 function setStatus(message) {
   els.status.textContent = message;
+}
+
+function updateDataStatus(message) {
+  if (!els.dataStatus) return;
+
+  const mode = state.dataSource || (navigator.onLine ? "live" : "offline");
+  const label = message || (navigator.onLine ? "Live FTCScout data ready." : "Offline mode ready.");
+  els.dataStatus.dataset.mode = mode;
+  els.dataStatus.innerHTML = `
+    <span class="data-status__dot"></span>
+    <span>${escapeHtml(label)}</span>
+  `;
 }

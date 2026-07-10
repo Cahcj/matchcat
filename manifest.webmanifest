@@ -1,0 +1,18 @@
+{
+  "name": "MatchCat",
+  "short_name": "MatchCat",
+  "description": "Team 7305 match scouting dashboard with offline saved FTC data.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0b0b0c",
+  "theme_color": "#0b0b0c",
+  "icons": [
+    {
+      "src": "matchcat-hero.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -8,6 +8,8 @@
       name="description"
       content="MatchCat is a team 7305 member dashboard using live FTCScout data."
     >
+    <meta name="theme-color" content="#0b0b0c">
+    <link rel="manifest" href="manifest.webmanifest">
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
@@ -197,6 +199,10 @@
           <p class="hero__copy">
             The Clague GearCats match scout for FTCScout schedules, records, ranks, and opponents.
           </p>
+          <div class="data-status" id="data-status" aria-live="polite">
+            <span class="data-status__dot"></span>
+            <span>Checking FTCScout and Orange Alliance cache...</span>
+          </div>
           <div class="clague-rating" id="clague-rating" aria-live="polite">
             <span>Clague rating</span>
             <strong>Loading...</strong>
