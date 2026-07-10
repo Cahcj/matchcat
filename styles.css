@@ -424,6 +424,35 @@ main {
   font-weight: 800;
 }
 
+.auto-cloud-status {
+  grid-column: 1 / -1;
+  margin: -4px 0 0;
+  border: 1px solid rgba(35, 136, 217, 0.28);
+  border-radius: 12px;
+  background: rgba(35, 136, 217, 0.08);
+  color: rgba(246, 247, 251, 0.84);
+  font-size: 0.78rem;
+  font-weight: 850;
+  line-height: 1.35;
+  padding: 9px 12px;
+}
+
+.auto-cloud-status[data-mode="on"] {
+  border-color: rgba(25, 195, 125, 0.28);
+  background: rgba(25, 195, 125, 0.08);
+}
+
+.auto-cloud-status[data-mode="syncing"] {
+  border-color: rgba(35, 136, 217, 0.42);
+}
+
+.auto-cloud-status[data-mode="offline"],
+.auto-cloud-status[data-mode="off"] {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--muted);
+}
+
 .auto-stage {
   min-height: 0;
   display: grid;

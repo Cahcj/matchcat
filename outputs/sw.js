@@ -5,6 +5,7 @@ const APP_SHELL = [
   "./index.html",
   "./styles.css",
   "./app.js",
+  "./cloud-config.js",
   "./matchcat-hero.png",
   "./auto-field.png",
   "./manifest.webmanifest",

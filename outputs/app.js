@@ -2,6 +2,9 @@ const API_ROOT = "https://api.ftcscout.org/rest/v1";
 const TEAM_NUMBER = 7305;
 const AUTO_FIELD_IMAGE_SRC = "auto-field.png";
 const AUTO_STORAGE_KEY = "matchcat:auto-drawings:v1";
+const CLOUD_CONFIG = window.MATCHCAT_CLOUD || {};
+const CLOUD_SYNC_DEBOUNCE = 1100;
+const CLOUD_SYNC_INTERVAL = 45000;
 const DATA_CACHE_NAME = "matchcat-api-cache-v1";
 const DATA_CACHE_META_KEY = "matchcat:data-cache-meta:v1";
 const OFFLINE_REFRESH_DELAY = 900;
@@ -55,6 +58,11 @@ const state = {
   reconnectTimer: null,
   loadController: null,
   loadId: 0,
+  cloudSyncConfigured: false,
+  cloudSyncing: false,
+  cloudSyncTimer: null,
+  cloudSyncInterval: null,
+  cloudPendingSaves: new Map(),
   eventFilter: "all",
   picksEventFilter: "all",
   rankingEventFilter: "",
@@ -163,6 +171,7 @@ const els = {
   autoSize: document.querySelector("#auto-size"),
   autoSave: document.querySelector("#auto-save"),
   autoSaveStatus: document.querySelector("#auto-save-status"),
+  autoCloudStatus: document.querySelector("#auto-cloud-status"),
   autoDownload: document.querySelector("#auto-download"),
   sidebarToggle: document.querySelector("#sidebar-toggle"),
   sidebarBackdrop: document.querySelector("#sidebar-backdrop"),
@@ -179,6 +188,7 @@ els.form.addEventListener("submit", (event) => {
 
 registerServiceWorker();
 setupConnectivityListeners();
+setupCloudSync();
 
 els.yearInput.addEventListener("change", () => {
   refreshSelectedYear();
@@ -318,6 +328,8 @@ function setupConnectivityListeners() {
   window.addEventListener("online", () => {
     state.dataSource = "live";
     updateDataStatus("Back online. Refreshing FTCScout and Orange Alliance data...");
+    flushCloudAutoSaves();
+    syncAutoStorageFromCloud({ silent: true });
     window.clearTimeout(state.reconnectTimer);
     state.reconnectTimer = window.setTimeout(() => {
       loadTracker();
@@ -328,6 +340,29 @@ function setupConnectivityListeners() {
     state.dataSource = "offline";
     updateDataStatus("Offline mode: MatchCat will use saved FTCScout and Orange Alliance data.");
   });
+}
+
+function setupCloudSync() {
+  state.cloudSyncConfigured = isCloudSyncConfigured();
+  updateAutoCloudStatus();
+
+  if (!state.cloudSyncConfigured) return;
+
+  syncAutoStorageFromCloud({ silent: true });
+  window.clearInterval(state.cloudSyncInterval);
+  state.cloudSyncInterval = window.setInterval(() => {
+    if (navigator.onLine) {
+      flushCloudAutoSaves();
+      syncAutoStorageFromCloud({ silent: true });
+    }
+  }, CLOUD_SYNC_INTERVAL);
+}
+
+function isCloudSyncConfigured() {
+  return CLOUD_CONFIG.provider === "supabase" &&
+    Boolean(String(CLOUD_CONFIG.supabaseUrl || "").trim()) &&
+    Boolean(String(CLOUD_CONFIG.supabaseAnonKey || "").trim()) &&
+    Boolean(String(CLOUD_CONFIG.table || "").trim());
 }
 
 document.querySelectorAll(".sidebar-link[href]").forEach((link) => {
@@ -467,6 +502,7 @@ function openAutoMenu() {
   els.autoBackdrop.hidden = false;
   els.autoBackdrop.removeAttribute("hidden");
   renderAutoCanvas();
+  updateAutoCloudStatus();
   syncModalState();
 }
 
@@ -491,6 +527,8 @@ function openAutoTeamMenu() {
   els.autoPhotoInput.value = "";
   syncAutoPromptDetails();
   els.autoTeamStatus.textContent = getAutoTeamPromptStatus();
+  updateAutoCloudStatus();
+  syncAutoStorageFromCloud({ silent: true });
   setTimeout(() => els.autoTeamInput.focus(), 0);
   syncModalState();
 }
@@ -740,6 +778,188 @@ function setAutoStorage(storage) {
   localStorage.setItem(AUTO_STORAGE_KEY, JSON.stringify(storage));
 }
 
+function queueCloudAutoSave(teamKey, gameKey, teamRecord, autoRecord) {
+  if (!state.cloudSyncConfigured || !teamKey || !gameKey || !teamRecord || !autoRecord) return;
+
+  const row = makeCloudAutoRow(teamKey, gameKey, teamRecord, autoRecord);
+  state.cloudPendingSaves.set(row.id, row);
+  updateAutoCloudStatus("Cloud sync queued.");
+  window.clearTimeout(state.cloudSyncTimer);
+  state.cloudSyncTimer = window.setTimeout(flushCloudAutoSaves, CLOUD_SYNC_DEBOUNCE);
+}
+
+async function flushCloudAutoSaves() {
+  if (!state.cloudSyncConfigured || !state.cloudPendingSaves.size) return;
+
+  const rows = [...state.cloudPendingSaves.values()];
+  state.cloudSyncing = true;
+  updateAutoCloudStatus("Saving to shared MatchCat cloud...");
+
+  try {
+    await cloudRequest(`?on_conflict=id`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates,return=minimal",
+      },
+      body: JSON.stringify(rows),
+    });
+    rows.forEach((row) => state.cloudPendingSaves.delete(row.id));
+    updateAutoCloudStatus("Saved to shared cloud. Other phones can see it.");
+  } catch (error) {
+    console.warn("Could not sync ScoutingForm to cloud.", error);
+    updateAutoCloudStatus("Saved on this phone. Cloud sync will retry when online.");
+  } finally {
+    state.cloudSyncing = false;
+  }
+}
+
+async function syncAutoStorageFromCloud(options = {}) {
+  if (!state.cloudSyncConfigured || state.cloudSyncing || !navigator.onLine) {
+    updateAutoCloudStatus();
+    return;
+  }
+
+  state.cloudSyncing = true;
+
+  if (!options.silent) {
+    updateAutoCloudStatus("Loading shared ScoutingForms...");
+  }
+
+  try {
+    const rows = await cloudRequest("?select=*&order=updated_at.desc");
+    const mergedCount = mergeCloudAutoRows(Array.isArray(rows) ? rows : []);
+    updateAutoCloudStatus(mergedCount
+      ? `Synced ${mergedCount} shared ScoutingForm${mergedCount === 1 ? "" : "s"}.`
+      : "Cloud sync ready. No shared forms yet.");
+    renderTeamDetail();
+  } catch (error) {
+    console.warn("Could not load shared ScoutingForms.", error);
+    updateAutoCloudStatus("Cloud sync is having trouble. Local saves still work.");
+  } finally {
+    state.cloudSyncing = false;
+  }
+}
+
+async function deleteCloudAuto(teamKey, gameKey) {
+  if (!state.cloudSyncConfigured || !teamKey || !gameKey) return;
+
+  const id = getCloudAutoId(teamKey, gameKey);
+
+  try {
+    await cloudRequest(`?id=eq.${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      headers: { Prefer: "return=minimal" },
+    });
+    updateAutoCloudStatus("Deleted from shared cloud.");
+  } catch (error) {
+    console.warn("Could not delete shared ScoutingForm.", error);
+    updateAutoCloudStatus("Deleted on this phone. Cloud delete needs a retry.");
+  }
+}
+
+async function cloudRequest(query = "", options = {}) {
+  const url = `${String(CLOUD_CONFIG.supabaseUrl).replace(/\/+$/, "")}/rest/v1/${encodeURIComponent(CLOUD_CONFIG.table)}${query}`;
+  const headers = {
+    apikey: CLOUD_CONFIG.supabaseAnonKey,
+    Authorization: `Bearer ${CLOUD_CONFIG.supabaseAnonKey}`,
+    ...options.headers,
+  };
+  const response = await fetch(url, { ...options, headers });
+
+  if (!response.ok) {
+    throw new Error(`${response.status} ${response.statusText}`);
+  }
+
+  if (response.status === 204) return null;
+
+  const text = await response.text();
+  return text ? JSON.parse(text) : null;
+}
+
+function mergeCloudAutoRows(rows) {
+  const storage = getAutoStorage();
+  let mergedCount = 0;
+
+  rows.forEach((row) => {
+    const teamKey = getAutoTeamKey(row.team_key || "");
+    const gameKey = String(row.game_key || "");
+
+    if (!teamKey || !gameKey) return;
+
+    storage[teamKey] = storage[teamKey] || {
+      label: row.team_label || teamKey,
+      updatedAt: "",
+      autos: {},
+    };
+
+    const existing = storage[teamKey].autos?.[gameKey];
+    const incomingUpdatedAt = row.updated_at || "";
+    const existingUpdatedAt = existing?.updatedAt || "";
+
+    if (existing && existingUpdatedAt > incomingUpdatedAt) return;
+
+    storage[teamKey].label = row.team_label || storage[teamKey].label || teamKey;
+    storage[teamKey].updatedAt = incomingUpdatedAt || storage[teamKey].updatedAt;
+    storage[teamKey].autos[gameKey] = {
+      gameKey,
+      gameLabel: row.game_label || getAutoGameLabel(gameKey),
+      addedDate: row.added_date || incomingUpdatedAt.slice(0, 10) || getTodayDateString(),
+      motorRpm: row.motor_rpm || "312rpm",
+      robotPhoto: safeAutoPhotoSrc(row.robot_photo),
+      notes: row.notes || "",
+      updatedAt: incomingUpdatedAt,
+      strokes: Array.isArray(row.strokes) ? row.strokes : [],
+    };
+    mergedCount += 1;
+  });
+
+  if (mergedCount) {
+    setAutoStorage(storage);
+  }
+
+  return mergedCount;
+}
+
+function makeCloudAutoRow(teamKey, gameKey, teamRecord, autoRecord) {
+  return {
+    id: getCloudAutoId(teamKey, gameKey),
+    team_key: teamKey,
+    game_key: gameKey,
+    team_label: teamRecord.label || teamKey,
+    game_label: autoRecord.gameLabel || getAutoGameLabel(gameKey),
+    added_date: autoRecord.addedDate || getTodayDateString(),
+    motor_rpm: autoRecord.motorRpm || "312rpm",
+    robot_photo: safeAutoPhotoSrc(autoRecord.robotPhoto),
+    notes: autoRecord.notes || "",
+    strokes: Array.isArray(autoRecord.strokes) ? autoRecord.strokes : [],
+    updated_at: autoRecord.updatedAt || new Date().toISOString(),
+  };
+}
+
+function getCloudAutoId(teamKey, gameKey) {
+  return `${teamKey}__${gameKey}`;
+}
+
+function updateAutoCloudStatus(message = "") {
+  if (!els.autoCloudStatus) return;
+
+  if (!state.cloudSyncConfigured) {
+    els.autoCloudStatus.dataset.mode = "off";
+    els.autoCloudStatus.textContent = "Cloud sync off. Reports are saved on this device only.";
+    return;
+  }
+
+  if (!navigator.onLine) {
+    els.autoCloudStatus.dataset.mode = "offline";
+    els.autoCloudStatus.textContent = "Offline. Reports save here and sync when internet comes back.";
+    return;
+  }
+
+  els.autoCloudStatus.dataset.mode = state.cloudSyncing ? "syncing" : "on";
+  els.autoCloudStatus.textContent = message || "Cloud sync on. Reports are shared across devices.";
+}
+
 function getAutoTeamKey(label) {
   return label
     .trim()
@@ -753,9 +973,10 @@ function getAutoTeamPromptStatus() {
     (total, teamRecord) => total + Object.keys(teamRecord.autos || {}).length,
     0,
   );
+  const syncLabel = state.cloudSyncConfigured ? "Shared cloud sync is on." : "Cloud sync is off.";
   return savedCount
-    ? `${savedCount} saved ScoutingForm${savedCount === 1 ? "" : "s"} on this device.`
-    : "Saved ScoutingForms stay on this device.";
+    ? `${savedCount} saved ScoutingForm${savedCount === 1 ? "" : "s"}. ${syncLabel}`
+    : `No saved ScoutingForms yet. ${syncLabel}`;
 }
 
 function renderAutoGameOptions() {
@@ -887,6 +1108,7 @@ function saveAutoDrawing(options = {}) {
     strokes: state.autoStrokes,
   };
   setAutoStorage(storage);
+  queueCloudAutoSave(state.autoTeamKey, gameKey, storage[state.autoTeamKey], storage[state.autoTeamKey].autos[gameKey]);
 
   if (!options.silent) {
     els.autoSaveStatus.textContent = `Saved ${storage[state.autoTeamKey].autos[gameKey].gameLabel} ScoutingForm for ${state.autoTeamLabel}.`;
@@ -953,6 +1175,7 @@ function deleteSavedAuto(teamKey, gameKey) {
   }
 
   setAutoStorage(storage);
+  deleteCloudAuto(teamKey, gameKey);
 
   if (state.autoTeamKey === teamKey && state.autoGameKey === gameKey) {
     state.autoStrokes = [];
