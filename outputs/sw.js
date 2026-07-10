@@ -1,4 +1,4 @@
-const APP_CACHE = "matchcat-app-v1";
+const APP_CACHE = "matchcat-app-v2";
 const RUNTIME_CACHE = "matchcat-api-cache-v1";
 const APP_SHELL = [
   "./",
@@ -19,7 +19,7 @@ const DATA_HOSTS = new Set([
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(APP_CACHE)
-      .then((cache) => cache.addAll(APP_SHELL))
+      .then((cache) => Promise.allSettled(APP_SHELL.map((url) => cache.add(url))))
       .then(() => self.skipWaiting()),
   );
 });

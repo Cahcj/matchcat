@@ -53,6 +53,8 @@ const state = {
   usedCachedData: false,
   lastSyncAt: "",
   reconnectTimer: null,
+  loadController: null,
+  loadId: 0,
   eventFilter: "all",
   picksEventFilter: "all",
   rankingEventFilter: "",
@@ -230,6 +232,7 @@ els.sidebarToggle.addEventListener("click", () => {
   const isOpen = document.body.classList.toggle("sidebar-open");
   els.sidebarToggle.setAttribute("aria-expanded", String(isOpen));
   els.sidebarBackdrop.hidden = !isOpen;
+  syncModalState();
 });
 
 els.sidebarBackdrop.addEventListener("click", closeSidebar);
@@ -299,9 +302,13 @@ function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
 
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("sw.js").catch((error) => {
-      console.warn("MatchCat offline worker could not register.", error);
-    });
+    navigator.serviceWorker.register("sw.js")
+      .then((registration) => {
+        registration.update?.();
+      })
+      .catch((error) => {
+        console.warn("MatchCat offline worker could not register.", error);
+      });
   });
 }
 
@@ -325,9 +332,7 @@ function setupConnectivityListeners() {
 
 document.querySelectorAll(".sidebar-link[href]").forEach((link) => {
   link.addEventListener("click", () => {
-    document.querySelectorAll(".sidebar-link").forEach((item) => {
-      item.classList.toggle("is-active", item === link);
-    });
+    setActiveSidebar(link);
     closePicksMenu();
     closeRankingMenu();
     closeSimulatorMenu();
@@ -336,16 +341,42 @@ document.querySelectorAll(".sidebar-link[href]").forEach((link) => {
   });
 });
 
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape") return;
+
+  closePicksMenu();
+  closeRankingMenu();
+  closeSimulatorMenu();
+  closeAutoMenu();
+  closeSidebar();
+});
+
 function closeSidebar() {
   document.body.classList.remove("sidebar-open");
   els.sidebarToggle.setAttribute("aria-expanded", "false");
   els.sidebarBackdrop.hidden = true;
+  syncModalState();
+}
+
+function setActiveSidebar(activeItem) {
+  document.querySelectorAll(".sidebar-link").forEach((item) => {
+    item.classList.toggle("is-active", item === activeItem);
+  });
+}
+
+function syncModalState() {
+  const hasOverlay =
+    document.body.classList.contains("picks-open") ||
+    document.body.classList.contains("ranking-open") ||
+    document.body.classList.contains("sim-open") ||
+    document.body.classList.contains("auto-open") ||
+    document.body.classList.contains("sidebar-open");
+
+  document.body.classList.toggle("modal-open", hasOverlay);
 }
 
 function openPicksMenu() {
-  document.querySelectorAll(".sidebar-link").forEach((item) => {
-    item.classList.toggle("is-active", item === els.picksOpen);
-  });
+  setActiveSidebar(els.picksOpen);
   closeSidebar();
   closeRankingMenu();
   closeSimulatorMenu();
@@ -355,18 +386,18 @@ function openPicksMenu() {
   els.picksMenu.removeAttribute("hidden");
   els.picksBackdrop.hidden = false;
   els.picksBackdrop.removeAttribute("hidden");
+  syncModalState();
 }
 
 function closePicksMenu() {
   document.body.classList.remove("picks-open");
   els.picksMenu.hidden = true;
   els.picksBackdrop.hidden = true;
+  syncModalState();
 }
 
 function openRankingMenu() {
-  document.querySelectorAll(".sidebar-link").forEach((item) => {
-    item.classList.toggle("is-active", item === els.rankingOpen);
-  });
+  setActiveSidebar(els.rankingOpen);
   closeSidebar();
   closePicksMenu();
   closeSimulatorMenu();
@@ -383,18 +414,18 @@ function openRankingMenu() {
   els.rankingBackdrop.hidden = false;
   els.rankingBackdrop.removeAttribute("hidden");
   renderRanking();
+  syncModalState();
 }
 
 function closeRankingMenu() {
   document.body.classList.remove("ranking-open");
   els.rankingMenu.hidden = true;
   els.rankingBackdrop.hidden = true;
+  syncModalState();
 }
 
 function openSimulatorMenu() {
-  document.querySelectorAll(".sidebar-link").forEach((item) => {
-    item.classList.toggle("is-active", item === els.simOpen);
-  });
+  setActiveSidebar(els.simOpen);
   closeSidebar();
   closePicksMenu();
   closeRankingMenu();
@@ -412,18 +443,18 @@ function openSimulatorMenu() {
   els.simBackdrop.hidden = false;
   els.simBackdrop.removeAttribute("hidden");
   renderAllianceSimulator();
+  syncModalState();
 }
 
 function closeSimulatorMenu() {
   document.body.classList.remove("sim-open");
   els.simMenu.hidden = true;
   els.simBackdrop.hidden = true;
+  syncModalState();
 }
 
 function openAutoMenu() {
-  document.querySelectorAll(".sidebar-link").forEach((item) => {
-    item.classList.toggle("is-active", item === els.autoOpen);
-  });
+  setActiveSidebar(els.autoOpen);
   closeSidebar();
   closePicksMenu();
   closeRankingMenu();
@@ -436,12 +467,11 @@ function openAutoMenu() {
   els.autoBackdrop.hidden = false;
   els.autoBackdrop.removeAttribute("hidden");
   renderAutoCanvas();
+  syncModalState();
 }
 
 function openAutoTeamMenu() {
-  document.querySelectorAll(".sidebar-link").forEach((item) => {
-    item.classList.toggle("is-active", item === els.autoOpen);
-  });
+  setActiveSidebar(els.autoOpen);
   closeSidebar();
   closePicksMenu();
   closeRankingMenu();
@@ -462,6 +492,7 @@ function openAutoTeamMenu() {
   syncAutoPromptDetails();
   els.autoTeamStatus.textContent = getAutoTeamPromptStatus();
   setTimeout(() => els.autoTeamInput.focus(), 0);
+  syncModalState();
 }
 
 function closeAutoTeamMenu() {
@@ -470,6 +501,7 @@ function closeAutoTeamMenu() {
     document.body.classList.remove("auto-open");
     els.autoBackdrop.hidden = true;
   }
+  syncModalState();
 }
 
 function closeAutoMenu() {
@@ -479,6 +511,7 @@ function closeAutoMenu() {
   els.autoMenu.hidden = true;
   els.autoTeamMenu.hidden = true;
   els.autoBackdrop.hidden = true;
+  syncModalState();
 }
 
 function startAutoForTypedTeam() {
@@ -1204,6 +1237,13 @@ renderAutoCanvas();
 loadTracker();
 
 async function loadTracker() {
+  state.loadController?.abort();
+  const loadController = new AbortController();
+  const loadId = state.loadId + 1;
+  state.loadController = loadController;
+  state.loadId = loadId;
+  const { signal } = loadController;
+
   setLoading();
   state.usedCachedData = false;
   state.details = new Map();
@@ -1226,24 +1266,28 @@ async function loadTracker() {
 
   try {
     const [teamInfo, seasonMatches] = await Promise.all([
-      getJson(`${API_ROOT}/teams/${state.team}`),
-      loadTeamMatchesForGameYear(state.year),
+      getJson(`${API_ROOT}/teams/${state.team}`, { signal }),
+      loadTeamMatchesForGameYear(state.year, { signal }),
     ]);
 
+    if (loadId !== state.loadId) return;
     state.teamInfo = teamInfo;
     state.participation = seasonMatches;
-    await loadEventDetails();
+    await loadEventDetails({ signal });
+    if (loadId !== state.loadId) return;
     state.participation = state.participation.filter((match) => isMatchInGameYear(match));
     state.eventTeamInsights = buildEventTeamInsights();
     state.teamEventStats = buildTeamEventStats();
     state.teamEventRanks = buildTeamEventRanks();
-    await loadOpponentTeamNames();
+    await loadOpponentTeamNames({ signal });
+    if (loadId !== state.loadId) return;
     populateEventFilter();
     populatePicksEventFilter();
     populateRankingEventFilter();
     populateSimulatorEventFilter();
     populateSimulatorPartnerFilter();
     render();
+    document.body.classList.remove("is-loading");
     state.dataSource = state.usedCachedData ? "cached" : "live";
     state.lastSyncAt = new Date().toISOString();
     setStatus(state.usedCachedData
@@ -1253,7 +1297,9 @@ async function loadTracker() {
       ? `Offline-ready: showing last saved FTCScout/Orange Alliance data for ${getSeasonLabel(state.year)}.`
       : `Live data loaded. Offline copy saved for ${getSeasonLabel(state.year)}.`);
   } catch (error) {
+    if (error.name === "AbortError" || loadId !== state.loadId) return;
     console.error(error);
+    document.body.classList.remove("is-loading");
     state.dataSource = navigator.onLine ? "error" : "offline";
     setStatus("FTCScout data could not load right now.");
     updateDataStatus(navigator.onLine
@@ -1269,10 +1315,10 @@ async function loadTracker() {
   }
 }
 
-async function loadTeamMatchesForGameYear(year) {
+async function loadTeamMatchesForGameYear(year, options = {}) {
   const season = ftcScoutSeasonForGameYear(year);
   const responses = await Promise.allSettled([
-    getJson(`${API_ROOT}/teams/${state.team}/matches?season=${season}`),
+    getJson(`${API_ROOT}/teams/${state.team}/matches?season=${season}`, options),
   ]);
 
   return responses.flatMap((response) =>
@@ -1280,7 +1326,7 @@ async function loadTeamMatchesForGameYear(year) {
   );
 }
 
-async function loadEventDetails() {
+async function loadEventDetails(options = {}) {
   const eventKeys = [...new Set(
     state.participation.map((match) => `${match.season}:${match.eventCode}`),
   )];
@@ -1288,9 +1334,9 @@ async function loadEventDetails() {
     const [season, eventCode] = eventKey.split(":");
     try {
       const [matchesResponse, eventInfoResponse, eventTeamsResponse] = await Promise.allSettled([
-        getJson(`${API_ROOT}/events/${season}/${eventCode}/matches`),
-        getJson(`${API_ROOT}/events/${season}/${eventCode}`),
-        getJson(`${API_ROOT}/events/${season}/${eventCode}/teams`),
+        getJson(`${API_ROOT}/events/${season}/${eventCode}/matches`, options),
+        getJson(`${API_ROOT}/events/${season}/${eventCode}`, options),
+        getJson(`${API_ROOT}/events/${season}/${eventCode}/teams`, options),
       ]);
 
       if (eventInfoResponse.status === "fulfilled") {
@@ -1328,7 +1374,7 @@ async function loadEventDetails() {
   await Promise.allSettled(requests);
 }
 
-async function loadOpponentTeamNames() {
+async function loadOpponentTeamNames(options = {}) {
   const teamNumbers = new Set();
 
   state.participation.forEach((entry) => {
@@ -1349,7 +1395,7 @@ async function loadOpponentTeamNames() {
 
   const requests = [...teamNumbers].map(async (teamNumber) => {
     try {
-      const team = await getJson(`${API_ROOT}/teams/${teamNumber}`);
+      const team = await getJson(`${API_ROOT}/teams/${teamNumber}`, options);
       state.teamNames.set(teamNumber, team?.name ?? `Team ${teamNumber}`);
       state.teamProfiles.set(teamNumber, team);
     } catch (error) {
@@ -1361,8 +1407,11 @@ async function loadOpponentTeamNames() {
   await Promise.allSettled(requests);
 }
 
-async function getJson(url) {
-  const request = new Request(url, { headers: { accept: "application/json" } });
+async function getJson(url, options = {}) {
+  const request = new Request(url, {
+    headers: { accept: "application/json" },
+    signal: options.signal,
+  });
 
   try {
     const response = await fetch(request);
@@ -1374,6 +1423,10 @@ async function getJson(url) {
     rememberCachedUrl(url);
     return response.json();
   } catch (error) {
+    if (error.name === "AbortError") {
+      throw error;
+    }
+
     const cached = await getCachedApiResponse(request);
 
     if (cached) {
@@ -2918,6 +2971,8 @@ function ftcScoutSeasonForGameYear(year) {
 }
 
 function setLoading() {
+  document.body.classList.add("is-loading");
+  state.dataSource = navigator.onLine ? "checking" : "offline";
   els.teamName.textContent = "Loading...";
   els.teamLocation.textContent = "FTC team profile";
   els.matchCount.textContent = "--";
