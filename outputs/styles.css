@@ -114,6 +114,7 @@ main {
 }
 
 .picks-backdrop,
+.ranking-backdrop,
 .sim-backdrop,
 .auto-backdrop {
   position: fixed;
@@ -124,6 +125,8 @@ main {
 
 .picks-backdrop[hidden],
 .picks-menu[hidden],
+.ranking-backdrop[hidden],
+.ranking-menu[hidden],
 .sim-backdrop[hidden],
 .sim-menu[hidden],
 .auto-team-menu[hidden],
@@ -226,6 +229,7 @@ main {
 }
 
 .picks-menu,
+.ranking-menu,
 .sim-menu,
 .auto-menu {
   position: fixed;
@@ -244,6 +248,7 @@ main {
 }
 
 .picks-menu__header,
+.ranking-menu__header,
 .sim-menu__header,
 .auto-menu__header {
   display: flex;
@@ -271,6 +276,7 @@ main {
 }
 
 .picks-menu__status,
+.ranking-menu__status,
 .sim-menu__status {
   max-width: none;
   border-bottom: 1px solid var(--line);
@@ -279,12 +285,14 @@ main {
 }
 
 .picks-menu__controls,
+.ranking-menu__controls,
 .sim-menu__controls {
   border-bottom: 1px solid var(--line);
   padding: 14px 26px;
 }
 
 .picks-menu__controls label,
+.ranking-menu__controls label,
 .sim-menu__controls label {
   display: grid;
   grid-template-columns: 120px minmax(220px, 420px);
@@ -1020,6 +1028,14 @@ td {
   padding: 18px;
 }
 
+.ranking-list {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  overflow-y: auto;
+  padding: 18px;
+}
+
 .sim-list {
   display: grid;
   gap: 12px;
@@ -1037,6 +1053,82 @@ td {
   border-radius: 14px;
   background: var(--panel-soft);
   padding: 14px;
+}
+
+.ranking-card {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) minmax(340px, auto);
+  gap: 16px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel-soft);
+  padding: 14px;
+}
+
+.ranking-card--home {
+  border-color: rgba(25, 195, 125, 0.42);
+  background: linear-gradient(135deg, rgba(25, 195, 125, 0.12), rgba(35, 136, 217, 0.08));
+}
+
+.ranking-card__rank {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--blue);
+  color: #eef7ff;
+  font-weight: 950;
+}
+
+.ranking-card--home .ranking-card__rank {
+  background: var(--green);
+  color: #06130d;
+}
+
+.ranking-card__main {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.ranking-card__team {
+  width: auto;
+  max-width: none;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  color: var(--ink);
+  font-size: 1.05rem;
+}
+
+.ranking-card__team span {
+  color: var(--green);
+}
+
+.ranking-card__stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(66px, 1fr));
+  gap: 8px;
+}
+
+.ranking-card__stats span {
+  display: grid;
+  gap: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.035);
+  padding: 8px 10px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.ranking-card__stats strong {
+  color: var(--ink);
+  font-size: 1rem;
 }
 
 .sim-card,
@@ -1224,12 +1316,14 @@ td {
   }
 
   body.auto-open .auto-menu,
+  body.ranking-open .ranking-menu,
   body.sim-open .sim-menu,
   body.picks-open .picks-menu {
     display: grid;
   }
 
   body.auto-open .auto-backdrop,
+  body.ranking-open .ranking-backdrop,
   body.sim-open .sim-backdrop,
   body.picks-open .picks-backdrop {
     display: block;
@@ -1248,6 +1342,7 @@ td {
   }
 
   .picks-menu,
+  .ranking-menu,
   .sim-menu,
   .auto-menu {
     top: 66px;
@@ -1258,6 +1353,7 @@ td {
   }
 
   .picks-menu__header,
+  .ranking-menu__header,
   .sim-menu__header,
   .auto-menu__header {
     flex-wrap: wrap;
@@ -1296,17 +1392,20 @@ td {
   }
 
   .picks-menu__controls,
+  .ranking-menu__controls,
   .sim-menu__controls {
     padding: 12px 16px;
   }
 
   .picks-menu__controls label,
+  .ranking-menu__controls label,
   .sim-menu__controls label {
     grid-template-columns: 1fr;
     gap: 7px;
   }
 
   .picks-menu__status,
+  .ranking-menu__status,
   .sim-menu__status {
     padding: 11px 16px;
   }
@@ -1353,6 +1452,7 @@ td {
   }
 
   .pick-card,
+  .ranking-card,
   .sim-card,
   .sim-summary-card {
     grid-template-columns: 48px minmax(0, 1fr);
@@ -1362,7 +1462,8 @@ td {
     grid-template-columns: 1fr;
   }
 
-  .pick-card__stats {
+  .pick-card__stats,
+  .ranking-card__stats {
     grid-column: 1 / -1;
   }
 }

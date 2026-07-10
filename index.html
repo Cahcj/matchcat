@@ -24,6 +24,7 @@
       <nav class="app-sidebar__nav">
         <a href="#page-title" class="sidebar-link is-active">Dashboard</a>
         <button class="sidebar-link" id="picks-open" type="button">Picks</button>
+        <button class="sidebar-link" id="ranking-open" type="button">Ranking</button>
         <button class="sidebar-link" id="sim-open" type="button">Alliance Simulator</button>
         <button class="sidebar-link" id="auto-open" type="button">ScoutingForm</button>
         <a href="#matches" class="sidebar-link">Past Matches</a>
@@ -31,6 +32,7 @@
     </aside>
     <div class="sidebar-backdrop" id="sidebar-backdrop" hidden></div>
     <div class="picks-backdrop" id="picks-backdrop" hidden></div>
+    <div class="ranking-backdrop" id="ranking-backdrop" hidden></div>
     <div class="sim-backdrop" id="sim-backdrop" hidden></div>
     <section class="picks-menu" id="picks-menu" aria-labelledby="picks-title" hidden>
       <div class="picks-menu__header">
@@ -51,6 +53,25 @@
       <div class="status picks-menu__status" id="picks-status">Ranking teams from FTCScout data...</div>
       <div class="picks-list" id="picks-list">
         <div class="empty">Loading pick list...</div>
+      </div>
+    </section>
+    <section class="ranking-menu" id="ranking-menu" aria-labelledby="ranking-title" hidden>
+      <div class="ranking-menu__header">
+        <div>
+          <p class="section-kicker">Competition Standings</p>
+          <h2 id="ranking-title">Ranking</h2>
+        </div>
+        <button class="button button--dark button--small" id="ranking-close" type="button">Close</button>
+      </div>
+      <div class="ranking-menu__controls">
+        <label>
+          Competition
+          <select id="ranking-event-filter"></select>
+        </label>
+      </div>
+      <div class="status ranking-menu__status" id="ranking-status">Choose a competition to see rankings.</div>
+      <div class="ranking-list" id="ranking-list">
+        <div class="empty">Loading rankings...</div>
       </div>
     </section>
     <section class="sim-menu" id="sim-menu" aria-labelledby="sim-title" hidden>

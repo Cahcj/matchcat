@@ -47,6 +47,7 @@ const state = {
   teamSeasonEventCache: new Map(),
   eventFilter: "all",
   picksEventFilter: "all",
+  rankingEventFilter: "",
   simEventFilter: "",
   simPartnerTeam: "",
   autoTool: "draw",
@@ -101,6 +102,13 @@ const els = {
   picksOpen: document.querySelector("#picks-open"),
   picksClose: document.querySelector("#picks-close"),
   picksBackdrop: document.querySelector("#picks-backdrop"),
+  rankingEventFilter: document.querySelector("#ranking-event-filter"),
+  rankingList: document.querySelector("#ranking-list"),
+  rankingStatus: document.querySelector("#ranking-status"),
+  rankingMenu: document.querySelector("#ranking-menu"),
+  rankingOpen: document.querySelector("#ranking-open"),
+  rankingClose: document.querySelector("#ranking-close"),
+  rankingBackdrop: document.querySelector("#ranking-backdrop"),
   simEventFilter: document.querySelector("#sim-event-filter"),
   simPartnerFilter: document.querySelector("#sim-partner-filter"),
   simList: document.querySelector("#sim-list"),
@@ -183,6 +191,11 @@ els.picksEventFilter.addEventListener("change", () => {
   renderPicks();
 });
 
+els.rankingEventFilter.addEventListener("change", () => {
+  state.rankingEventFilter = els.rankingEventFilter.value;
+  renderRanking();
+});
+
 els.simEventFilter.addEventListener("change", () => {
   state.simEventFilter = els.simEventFilter.value;
   populateSimulatorPartnerFilter();
@@ -212,6 +225,12 @@ els.picksOpen.addEventListener("click", (event) => {
 });
 els.picksClose.addEventListener("click", closePicksMenu);
 els.picksBackdrop.addEventListener("click", closePicksMenu);
+els.rankingOpen.addEventListener("click", (event) => {
+  event.preventDefault();
+  openRankingMenu();
+});
+els.rankingClose.addEventListener("click", closeRankingMenu);
+els.rankingBackdrop.addEventListener("click", closeRankingMenu);
 els.simOpen.addEventListener("click", (event) => {
   event.preventDefault();
   openSimulatorMenu();
@@ -267,6 +286,7 @@ document.querySelectorAll(".sidebar-link[href]").forEach((link) => {
       item.classList.toggle("is-active", item === link);
     });
     closePicksMenu();
+    closeRankingMenu();
     closeSimulatorMenu();
     closeAutoMenu();
     closeSidebar();
@@ -284,6 +304,7 @@ function openPicksMenu() {
     item.classList.toggle("is-active", item === els.picksOpen);
   });
   closeSidebar();
+  closeRankingMenu();
   closeSimulatorMenu();
   closeAutoMenu();
   document.body.classList.add("picks-open");
@@ -299,12 +320,41 @@ function closePicksMenu() {
   els.picksBackdrop.hidden = true;
 }
 
+function openRankingMenu() {
+  document.querySelectorAll(".sidebar-link").forEach((item) => {
+    item.classList.toggle("is-active", item === els.rankingOpen);
+  });
+  closeSidebar();
+  closePicksMenu();
+  closeSimulatorMenu();
+  closeAutoMenu();
+
+  if (!state.rankingEventFilter) {
+    state.rankingEventFilter = getDefaultRankingEventKey();
+    els.rankingEventFilter.value = state.rankingEventFilter;
+  }
+
+  document.body.classList.add("ranking-open");
+  els.rankingMenu.hidden = false;
+  els.rankingMenu.removeAttribute("hidden");
+  els.rankingBackdrop.hidden = false;
+  els.rankingBackdrop.removeAttribute("hidden");
+  renderRanking();
+}
+
+function closeRankingMenu() {
+  document.body.classList.remove("ranking-open");
+  els.rankingMenu.hidden = true;
+  els.rankingBackdrop.hidden = true;
+}
+
 function openSimulatorMenu() {
   document.querySelectorAll(".sidebar-link").forEach((item) => {
     item.classList.toggle("is-active", item === els.simOpen);
   });
   closeSidebar();
   closePicksMenu();
+  closeRankingMenu();
   closeAutoMenu();
 
   if (!state.simEventFilter) {
@@ -333,6 +383,7 @@ function openAutoMenu() {
   });
   closeSidebar();
   closePicksMenu();
+  closeRankingMenu();
   closeSimulatorMenu();
   closeAutoTeamMenu();
   document.body.classList.add("auto-open");
@@ -350,6 +401,7 @@ function openAutoTeamMenu() {
   });
   closeSidebar();
   closePicksMenu();
+  closeRankingMenu();
   closeSimulatorMenu();
   stopAutoPath();
   document.body.classList.add("auto-open");
@@ -1074,6 +1126,7 @@ document.addEventListener("click", (event) => {
   if (!teamButton) return;
 
   closePicksMenu();
+  closeRankingMenu();
   closeSimulatorMenu();
   closeAutoMenu();
   openTeamDetail(Number(teamButton.dataset.teamNumber), teamButton.dataset.eventKey);
@@ -1094,6 +1147,7 @@ async function loadTracker() {
   state.teamSeasonEventCache = new Map();
   state.eventFilter = "all";
   state.picksEventFilter = "all";
+  state.rankingEventFilter = "";
   state.simEventFilter = "";
   state.simPartnerTeam = "";
   state.selectedTeam = null;
@@ -1116,6 +1170,7 @@ async function loadTracker() {
     await loadOpponentTeamNames();
     populateEventFilter();
     populatePicksEventFilter();
+    populateRankingEventFilter();
     populateSimulatorEventFilter();
     populateSimulatorPartnerFilter();
     render();
@@ -1125,6 +1180,8 @@ async function loadTracker() {
     setStatus("FTCScout data could not load right now.");
     els.picksStatus.textContent = "No pick data loaded.";
     els.picksList.innerHTML = `<div class="empty">No pick data returned for this team and season.</div>`;
+    els.rankingStatus.textContent = "No ranking data loaded.";
+    els.rankingList.innerHTML = `<div class="empty">No ranking data returned for this team and season.</div>`;
     els.simStatus.textContent = "No simulator data loaded.";
     els.simList.innerHTML = `<div class="empty">No simulator data returned for this team and season.</div>`;
     els.matchBody.innerHTML = `<tr><td colspan="8" class="empty">No live data returned for this team and season.</td></tr>`;
@@ -1247,6 +1304,17 @@ function populatePicksEventFilter() {
   });
 }
 
+function populateRankingEventFilter() {
+  const events = getLoadedEvents();
+  state.rankingEventFilter = state.eventFilter !== "all" && events.some((event) => event.key === state.eventFilter)
+    ? state.eventFilter
+    : getDefaultRankingEventKey(events);
+  els.rankingEventFilter.innerHTML = events.map((event) => {
+    const selected = event.key === state.rankingEventFilter ? " selected" : "";
+    return `<option value="${escapeHtml(event.key)}"${selected}>${escapeHtml(event.name)}</option>`;
+  }).join("");
+}
+
 function populateSimulatorEventFilter() {
   const events = getLoadedEvents();
   state.simEventFilter = state.eventFilter !== "all" && events.some((event) => event.key === state.eventFilter)
@@ -1281,6 +1349,10 @@ function getDefaultSimulatorEventKey(events = getLoadedEvents()) {
   return [...events].sort((a, b) => eventSortTime(b.key) - eventSortTime(a.key))[0]?.key || "";
 }
 
+function getDefaultRankingEventKey(events = getLoadedEvents()) {
+  return [...events].sort((a, b) => eventSortTime(b.key) - eventSortTime(a.key))[0]?.key || "";
+}
+
 function getLoadedEvents() {
   return [...new Map(
     state.participation.map((match) => {
@@ -1304,6 +1376,7 @@ function render() {
   renderUpcomingMatch(upcomingMatch);
   renderTeamDetail();
   renderPicks();
+  renderRanking();
   renderAllianceSimulator();
   renderMatches(pastRows);
 }
@@ -1615,6 +1688,85 @@ function renderPicks() {
       </div>
     </article>
   `).join("");
+}
+
+function renderRanking() {
+  if (!els.rankingList) return;
+
+  const eventKeyForRanking = state.rankingEventFilter;
+  const rows = getRankingRows(eventKeyForRanking);
+  const scope = eventKeyForRanking ? eventDisplayName(eventKeyForRanking) : getSeasonLabel(state.year);
+
+  els.rankingStatus.textContent = rows.length
+    ? `${rows.length} ranked team${rows.length === 1 ? "" : "s"} for ${scope}.`
+    : `No ranking data found for ${scope}.`;
+
+  if (!rows.length) {
+    els.rankingList.innerHTML = `<div class="empty">No teams found for this competition yet.</div>`;
+    return;
+  }
+
+  els.rankingList.innerHTML = rows.map((team, index) => `
+    <article class="ranking-card ${team.teamNumber === TEAM_NUMBER ? "ranking-card--home" : ""}">
+      <div class="ranking-card__rank">${Number.isFinite(team.rank) ? `#${team.rank}` : `#${index + 1}`}</div>
+      <div class="ranking-card__main">
+        <button class="team-link ranking-card__team" type="button" data-team-number="${team.teamNumber}" data-event-key="${escapeHtml(team.eventKey)}">
+          <span>${team.teamNumber}</span>
+          ${escapeHtml(team.name)}
+        </button>
+        <div class="pick-card__meta">${team.record} / ${team.winRate}% win rate / ${escapeHtml(team.source)}</div>
+        <div class="stars" aria-label="${team.stars} out of 5 stars">${starRating(team.stars) || "0 stars"}</div>
+      </div>
+      <div class="ranking-card__stats">
+        <span>OPR <strong>${formatMaybeFixed(team.opr)}</strong></span>
+        <span>Auto <strong>${formatMaybeFixed(team.autoOpr)}</strong></span>
+        <span>Teleop <strong>${formatMaybeFixed(team.teleopOpr)}</strong></span>
+        <span>Score <strong>${Math.round(team.pickScore * 100)}</strong></span>
+      </div>
+    </article>
+  `).join("");
+}
+
+function getRankingRows(eventKeyForRanking) {
+  if (!eventKeyForRanking) return [];
+
+  const reports = normalizeCollection(state.eventTeamReports.get(eventKeyForRanking));
+  const teamNumbers = new Set(reports.map((report) => Number(report?.teamNumber)).filter(Number.isFinite));
+
+  state.teamEventStats.forEach((stats) => {
+    if (stats.eventKey === eventKeyForRanking) teamNumbers.add(stats.teamNumber);
+  });
+
+  return [...teamNumbers]
+    .map((teamNumber) => buildRankingRow(eventKeyForRanking, teamNumber, reports))
+    .filter(Boolean)
+    .sort((a, b) =>
+      getSortableRank(a.rank) - getSortableRank(b.rank) ||
+      b.pickScore - a.pickScore ||
+      (b.opr ?? 0) - (a.opr ?? 0) ||
+      a.teamNumber - b.teamNumber,
+    );
+}
+
+function buildRankingRow(eventKeyForRanking, teamNumber, reports) {
+  const candidate = buildPickCandidate(eventKeyForRanking, teamNumber, reports);
+  const insight = state.eventTeamInsights.get(teamStatsKey(eventKeyForRanking, teamNumber));
+
+  if (!candidate) return null;
+
+  return {
+    ...candidate,
+    autoOpr: insight?.autoOpr,
+    teleopOpr: insight?.teleopOpr,
+  };
+}
+
+function getSortableRank(rank) {
+  return Number.isFinite(rank) ? rank : Number.POSITIVE_INFINITY;
+}
+
+function formatMaybeFixed(value) {
+  return Number.isFinite(value) ? value.toFixed(1) : "--";
 }
 
 function getPickCandidates() {
