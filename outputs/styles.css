@@ -1057,54 +1057,54 @@ td {
 
 .ranking-card {
   display: grid;
-  grid-template-columns: 64px minmax(0, 1fr) minmax(340px, auto);
-  gap: 16px;
+  grid-template-columns: 76px minmax(0, 1fr) minmax(360px, auto);
+  gap: 2px 24px;
   align-items: center;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--panel-soft);
-  padding: 14px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  padding: 12px 14px;
 }
 
 .ranking-card--home {
-  border-color: rgba(25, 195, 125, 0.42);
-  background: linear-gradient(135deg, rgba(25, 195, 125, 0.12), rgba(35, 136, 217, 0.08));
+  border-color: rgba(25, 195, 125, 0.28);
+  background: rgba(25, 195, 125, 0.07);
 }
 
-.ranking-card__rank {
-  width: 48px;
-  height: 48px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--blue);
-  color: #eef7ff;
+.ranking-card__number {
+  color: var(--ink);
+  font-size: 1.12rem;
   font-weight: 950;
 }
 
-.ranking-card--home .ranking-card__rank {
-  background: var(--green);
-  color: #06130d;
+.ranking-card--home .ranking-card__number {
+  color: var(--green);
 }
 
 .ranking-card__main {
   display: grid;
-  gap: 5px;
+  gap: 3px;
   min-width: 0;
 }
 
 .ranking-card__team {
   width: auto;
   max-width: none;
-  display: flex;
-  gap: 8px;
-  align-items: baseline;
+  display: block;
   color: var(--ink);
-  font-size: 1.05rem;
+  font-size: 1.02rem;
+  font-weight: 950;
+  text-align: left;
 }
 
-.ranking-card__team span {
-  color: var(--green);
+.ranking-card__location {
+  color: #d6dbe2;
+  font-size: 0.88rem;
+  font-weight: 750;
+}
+
+.ranking-card__stars {
+  margin-top: 2px;
 }
 
 .ranking-card__stats {

@@ -44,6 +44,7 @@ const state = {
   teamEventStats: new Map(),
   teamEventRanks: new Map(),
   teamNames: new Map(),
+  teamProfiles: new Map(),
   teamSeasonEventCache: new Map(),
   eventFilter: "all",
   picksEventFilter: "all",
@@ -1144,6 +1145,7 @@ async function loadTracker() {
   state.teamEventStats = new Map();
   state.teamEventRanks = new Map();
   state.teamNames = new Map();
+  state.teamProfiles = new Map();
   state.teamSeasonEventCache = new Map();
   state.eventFilter = "all";
   state.picksEventFilter = "all";
@@ -1226,6 +1228,10 @@ async function loadEventDetails() {
           if (Number.isFinite(teamNumber) && name) {
             state.teamNames.set(teamNumber, name);
           }
+
+          if (Number.isFinite(teamNumber) && report?.team) {
+            state.teamProfiles.set(teamNumber, report.team);
+          }
         });
       }
 
@@ -1253,10 +1259,20 @@ async function loadOpponentTeamNames() {
       .forEach((team) => teamNumbers.add(team.teamNumber));
   });
 
+  state.eventTeamReports.forEach((reports) => {
+    normalizeCollection(reports).forEach((report) => {
+      const teamNumber = Number(report?.teamNumber);
+      if (Number.isFinite(teamNumber)) {
+        teamNumbers.add(teamNumber);
+      }
+    });
+  });
+
   const requests = [...teamNumbers].map(async (teamNumber) => {
     try {
       const team = await getJson(`${API_ROOT}/teams/${teamNumber}`);
       state.teamNames.set(teamNumber, team?.name ?? `Team ${teamNumber}`);
+      state.teamProfiles.set(teamNumber, team);
     } catch (error) {
       console.warn(`Could not load team ${teamNumber}`, error);
       state.teamNames.set(teamNumber, `Team ${teamNumber}`);
@@ -1708,14 +1724,14 @@ function renderRanking() {
 
   els.rankingList.innerHTML = rows.map((team, index) => `
     <article class="ranking-card ${team.teamNumber === TEAM_NUMBER ? "ranking-card--home" : ""}">
-      <div class="ranking-card__rank">${Number.isFinite(team.rank) ? `#${team.rank}` : `#${index + 1}`}</div>
+      <div class="ranking-card__number">${team.teamNumber}</div>
       <div class="ranking-card__main">
         <button class="team-link ranking-card__team" type="button" data-team-number="${team.teamNumber}" data-event-key="${escapeHtml(team.eventKey)}">
-          <span>${team.teamNumber}</span>
           ${escapeHtml(team.name)}
         </button>
-        <div class="pick-card__meta">${team.record} / ${team.winRate}% win rate / ${escapeHtml(team.source)}</div>
-        <div class="stars" aria-label="${team.stars} out of 5 stars">${starRating(team.stars) || "0 stars"}</div>
+        <div class="ranking-card__location">${escapeHtml(team.location || "Location unknown")}</div>
+        <div class="pick-card__meta">Rank ${Number.isFinite(team.rank) ? `#${team.rank}` : `#${index + 1}`} / ${team.record} / ${team.winRate}% win rate</div>
+        <div class="stars ranking-card__stars" aria-label="${team.stars} out of 5 stars">${starRating(team.stars) || "0 stars"}</div>
       </div>
       <div class="ranking-card__stats">
         <span>OPR <strong>${formatMaybeFixed(team.opr)}</strong></span>
@@ -1750,12 +1766,14 @@ function getRankingRows(eventKeyForRanking) {
 
 function buildRankingRow(eventKeyForRanking, teamNumber, reports) {
   const candidate = buildPickCandidate(eventKeyForRanking, teamNumber, reports);
+  const report = reports.find((entry) => Number(entry?.teamNumber) === teamNumber);
   const insight = state.eventTeamInsights.get(teamStatsKey(eventKeyForRanking, teamNumber));
 
   if (!candidate) return null;
 
   return {
     ...candidate,
+    location: getReportTeamLocation(report, teamNumber),
     autoOpr: insight?.autoOpr,
     teleopOpr: insight?.teleopOpr,
   };
@@ -2365,6 +2383,25 @@ function getReportTeamName(report) {
     ?? report?.nickname
     ?? report?.displayName
     ?? null;
+}
+
+function getReportTeamLocation(report, teamNumber) {
+  const profile = state.teamProfiles.get(teamNumber);
+  const team = {
+    ...(profile ?? {}),
+    ...(report ?? {}),
+    ...(report?.team ?? {}),
+  };
+  const city = team.city ?? team.town ?? team.location?.city;
+  const region = team.state ?? team.stateProv ?? team.province ?? team.location?.state;
+  const country = team.country ?? team.location?.country;
+  const fullLocation = team.locationName ?? team.location?.name ?? team.location;
+
+  if (typeof fullLocation === "string" && fullLocation.trim()) {
+    return fullLocation.trim();
+  }
+
+  return [city, region, country].filter(Boolean).join(", ");
 }
 
 function getPartnerAdjustedWinRate(key, teamNumber, fallbackWinRate) {
