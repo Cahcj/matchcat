@@ -2200,6 +2200,7 @@ function getPickCandidates() {
 
   eventKeys.forEach((key) => {
     const reports = normalizeCollection(state.eventTeamReports.get(key));
+    const pickContext = buildPickEventContext(key, reports);
     const teamNumbers = new Set(reports.map((report) => Number(report?.teamNumber)).filter(Number.isFinite));
 
     state.teamEventStats.forEach((stats) => {
@@ -2209,7 +2210,7 @@ function getPickCandidates() {
     teamNumbers.forEach((teamNumber) => {
       if (teamNumber === TEAM_NUMBER) return;
 
-      const current = buildPickCandidate(key, teamNumber, reports);
+      const current = buildPickCandidate(key, teamNumber, reports, pickContext);
       const previous = bestByTeam.get(teamNumber);
 
       if (current && (!previous || current.pickScore > previous.pickScore)) {
@@ -2226,7 +2227,12 @@ function getPickCandidates() {
   );
 }
 
-function buildPickCandidate(eventKeyForPick, teamNumber, reports) {
+function buildPickCandidate(eventKeyForPick, teamNumber, reports, pickContext = null) {
+  const context = pickContext ?? buildPickEventContext(eventKeyForPick, reports);
+  return buildPickCandidateWithContext(eventKeyForPick, teamNumber, reports, context);
+}
+
+function buildPickCandidateWithContext(eventKeyForPick, teamNumber, reports, context) {
   const stats = state.teamEventStats.get(teamStatsKey(eventKeyForPick, teamNumber));
   const insight = state.eventTeamInsights.get(teamStatsKey(eventKeyForPick, teamNumber));
   const report = reports.find((entry) => Number(entry?.teamNumber) === teamNumber);
@@ -2244,18 +2250,26 @@ function buildPickCandidate(eventKeyForPick, teamNumber, reports) {
       ? reportPlayed
       : wins + losses + ties;
   const winRate = played ? (wins + ties * 0.5) / played : 0;
-  const rankScore = Number.isFinite(rank) ? 1 / Math.max(rank, 1) : 0;
-  const oprScore = Number.isFinite(opr) ? Math.min(1, Math.max(0, opr / 120)) : 0;
-  const ratingScore = Number.isFinite(stats?.ratingScore)
-    ? stats.ratingScore
-    : Number.isFinite(insight?.ratingScore)
-      ? insight.ratingScore
-      : winRate;
+  const autoOpr = insight?.autoOpr ?? getAutoOprValue(report);
+  const rankScore = Number.isFinite(insight?.rankScore)
+    ? insight.rankScore
+    : getLinearRankScore(rank, context.teamCount);
+  const oprScore = Number.isFinite(insight?.oprScore)
+    ? insight.oprScore
+    : percentileScore(opr, context.oprValues);
+  const autoOprScore = Number.isFinite(insight?.autoOprScore)
+    ? insight.autoOprScore
+    : percentileScore(autoOpr, context.autoOprValues);
+  const winRateScore = Number.isFinite(insight?.winRateScore)
+    ? insight.winRateScore
+    : percentileScore(winRate, context.winRateValues);
+  const reliabilityScore = getPickReliabilityScore({ played, opr, rank, report, insight });
   const pickScore = weightedRatingScore([
-    { value: ratingScore, weight: 0.48 },
-    { value: oprScore, weight: 0.3 },
-    { value: winRate, weight: 0.14 },
-    { value: rankScore, weight: 0.08 },
+    { value: oprScore, weight: 0.5 },
+    { value: rankScore, weight: 0.22 },
+    { value: autoOprScore, weight: 0.12 },
+    { value: winRateScore, weight: 0.1 },
+    { value: reliabilityScore, weight: 0.06 },
   ]);
 
   if (!Number.isFinite(pickScore)) return null;
@@ -2271,8 +2285,60 @@ function buildPickCandidate(eventKeyForPick, teamNumber, reports) {
     record: `${wins}-${losses}-${ties}`,
     winRate: Math.round(winRate * 100),
     pickScore,
-    source: Number.isFinite(opr) ? "Star formula + OPR + record" : "Star formula + record",
+    source: "Pick score: OPR + rank + auto + record",
   };
+}
+
+function buildPickEventContext(eventKeyForPick, reports) {
+  const teamCountFromReports = normalizeCollection(reports).length;
+  const teamCountFromStats = [...state.teamEventStats.values()]
+    .filter((stats) => stats.eventKey === eventKeyForPick).length;
+  const valuesFromReports = normalizeCollection(reports);
+  const valuesFromInsights = [...state.eventTeamInsights.entries()]
+    .filter(([key]) => key.startsWith(`${eventKeyForPick}:`))
+    .map(([, insight]) => insight);
+  const statsRows = [...state.teamEventStats.values()]
+    .filter((stats) => stats.eventKey === eventKeyForPick);
+
+  return {
+    teamCount: Math.max(teamCountFromReports, teamCountFromStats, valuesFromInsights.length),
+    oprValues: finiteValues([
+      ...valuesFromReports.map((report) => getOprValue(report)),
+      ...valuesFromInsights.map((insight) => insight.opr),
+      ...statsRows.map((stats) => stats.opr),
+    ]),
+    autoOprValues: finiteValues([
+      ...valuesFromReports.map((report) => getAutoOprValue(report)),
+      ...valuesFromInsights.map((insight) => insight.autoOpr),
+    ]),
+    winRateValues: finiteValues([
+      ...valuesFromReports.map((report) => getReportWinRate(report)),
+      ...valuesFromInsights.map((insight) => insight.winRate),
+      ...statsRows.map((stats) => stats.winRate),
+    ]),
+  };
+}
+
+function finiteValues(values) {
+  return values
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value));
+}
+
+function getLinearRankScore(rank, teamCount) {
+  if (!Number.isFinite(rank) || !Number.isFinite(teamCount) || teamCount <= 1) return null;
+  return Math.max(0, Math.min(1, 1 - ((rank - 1) / (teamCount - 1))));
+}
+
+function getPickReliabilityScore({ played, opr, rank, report, insight }) {
+  let score = 0;
+
+  if (Number.isFinite(opr)) score += 0.36;
+  if (Number.isFinite(rank)) score += 0.28;
+  if (report || insight) score += 0.18;
+  score += Math.min(0.18, Math.max(0, played) / 5 * 0.18);
+
+  return Math.max(0, Math.min(1, score));
 }
 
 function renderAllianceSimulator() {
