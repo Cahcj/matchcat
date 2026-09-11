@@ -11,14 +11,17 @@ const OFFLINE_REFRESH_DELAY = 900;
 const AUTO_ROBOT_SIZE = 78;
 const AUTO_ROBOT_SPEED = 430;
 const AUTO_MIN_LINE_DRAG_DISTANCE = 14;
+const AUTO_FIELD_ROTATION = Math.PI;
 const AUTO_ROBOTS = {
   one: {
     label: "7305 A",
     color: "#19c37d",
+    start: { x: 350, y: 1180 },
   },
   two: {
     label: "7305 B",
     color: "#2388d9",
+    start: { x: 1090, y: 1180 },
   },
 };
 const GAME_SEASONS = {
@@ -76,8 +79,10 @@ const state = {
   autoCurrentStroke: null,
   autoSelectedPoint: null,
   autoDraggingPoint: false,
+  autoDraggingStartRobot: null,
   autoDragStartPoint: null,
   autoDragStartedOnPoint: false,
+  autoRobotStarts: getDefaultAutoRobotStarts(),
   autoRobotPlaying: false,
   autoRobotDistances: {
     one: 0,
@@ -776,6 +781,21 @@ function startAutoPointDrag(event) {
   event.preventDefault();
   stopAutoPath();
   const point = getAutoCanvasPoint(event);
+  const hitRobotStart = findAutoRobotStart(point);
+
+  if (hitRobotStart) {
+    state.autoSelectedRobot = hitRobotStart;
+    state.autoDraggingStartRobot = hitRobotStart;
+    state.autoSelectedPoint = null;
+    state.autoDraggingPoint = false;
+    state.autoDragStartPoint = point;
+    state.autoDragStartedOnPoint = false;
+    setAutoRobot(hitRobotStart);
+    els.autoCanvas.setPointerCapture(event.pointerId);
+    renderAutoCanvas();
+    return;
+  }
+
   const hitPoint = findAutoPoint(point);
   state.autoDragStartPoint = point;
   state.autoDragStartedOnPoint = Boolean(hitPoint);
@@ -793,6 +813,15 @@ function startAutoPointDrag(event) {
 }
 
 function continueAutoPointDrag(event) {
+  if (state.autoDraggingStartRobot) {
+    event.preventDefault();
+    const point = clampAutoPoint(getAutoCanvasPoint(event));
+    state.autoRobotStarts[state.autoDraggingStartRobot] = point;
+    resetAutoRobotDistances();
+    renderAutoCanvas();
+    return;
+  }
+
   if (!state.autoSelectedPoint) return;
 
   event.preventDefault();
@@ -821,6 +850,15 @@ function continueAutoPointDrag(event) {
 }
 
 function endAutoPointDrag() {
+  if (state.autoDraggingStartRobot) {
+    state.autoDraggingStartRobot = null;
+    state.autoDragStartPoint = null;
+    state.autoDragStartedOnPoint = false;
+    saveAutoDrawing({ silent: true });
+    renderAutoCanvas();
+    return;
+  }
+
   if (!state.autoDraggingPoint) {
     state.autoDragStartPoint = null;
     state.autoDragStartedOnPoint = false;
@@ -866,7 +904,9 @@ function clearAutoCanvas() {
   state.autoCurrentStroke = null;
   state.autoSelectedPoint = null;
   state.autoDraggingPoint = false;
+  state.autoDraggingStartRobot = null;
   state.autoDrawing = false;
+  state.autoRobotStarts = getDefaultAutoRobotStarts();
   resetAutoRobotDistances();
   saveAutoDrawing({ silent: true });
   renderAutoCanvas();
@@ -947,6 +987,52 @@ function isEditableAutoPath(stroke) {
 
 function removeEmptyAutoPaths() {
   state.autoStrokes = state.autoStrokes.filter((stroke) => !isEditableAutoPath(stroke) || stroke.points.length);
+}
+
+function getDefaultAutoRobotStarts() {
+  return Object.fromEntries(
+    Object.entries(AUTO_ROBOTS).map(([robotId, robot]) => [
+      robotId,
+      { x: robot.start.x, y: robot.start.y },
+    ]),
+  );
+}
+
+function normalizeAutoRobotStarts(starts) {
+  const defaults = getDefaultAutoRobotStarts();
+
+  Object.keys(AUTO_ROBOTS).forEach((robotId) => {
+    const point = normalizeAutoPoint(starts?.[robotId]);
+    if (point) {
+      defaults[robotId] = clampAutoPoint(point);
+    }
+  });
+
+  return defaults;
+}
+
+function clampAutoPoint(point) {
+  return {
+    x: Math.max(0, Math.min(els.autoCanvas.width, point.x)),
+    y: Math.max(0, Math.min(els.autoCanvas.height, point.y)),
+  };
+}
+
+function findAutoRobotStart(targetPoint) {
+  const hitRadius = AUTO_ROBOT_SIZE * 0.72;
+  let best = null;
+
+  Object.keys(AUTO_ROBOTS).forEach((robotId) => {
+    const point = state.autoRobotStarts[robotId];
+    if (!point) return;
+
+    const distance = Math.hypot(point.x - targetPoint.x, point.y - targetPoint.y);
+    if (distance <= hitRadius && (!best || distance < best.distance)) {
+      best = { robotId, distance };
+    }
+  });
+
+  return best?.robotId || null;
 }
 
 function findAutoPoint(targetPoint) {
@@ -1233,6 +1319,7 @@ function normalizeAutoTeamRecord(teamKey, record) {
         ...autoRecord,
         robotPhoto: safeAutoPhotoSrc(autoRecord?.robotPhoto),
         notes: autoRecord?.notes || "",
+        robotStarts: normalizeAutoRobotStarts(autoRecord?.robotStarts),
         strokes: normalizeAutoStrokes(autoRecord?.strokes),
       };
     });
@@ -1257,6 +1344,7 @@ function normalizeAutoTeamRecord(teamKey, record) {
           motorRpm: record.motorRpm || "312rpm",
           robotPhoto: safeAutoPhotoSrc(record.robotPhoto),
           notes: record.notes || "",
+          robotStarts: normalizeAutoRobotStarts(record.robotStarts),
           updatedAt: record.updatedAt || "",
           strokes: normalizeAutoStrokes(record.strokes),
         },
@@ -1338,6 +1426,7 @@ function loadAutoDrawingForTeam(
   state.autoMotorRpm = savedAuto?.motorRpm || motorRpm;
   state.autoRobotPhoto = safeAutoPhotoSrc(robotPhoto) || safeAutoPhotoSrc(savedAuto?.robotPhoto);
   state.autoNotes = notes || savedAuto?.notes || "";
+  state.autoRobotStarts = normalizeAutoRobotStarts(savedAuto?.robotStarts);
   state.autoStrokes = normalizeAutoStrokes(savedAuto?.strokes);
   state.autoCurrentStroke = null;
   state.autoSelectedPoint = null;
@@ -1375,6 +1464,7 @@ function saveAutoDrawing(options = {}) {
     motorRpm: state.autoMotorRpm || "312rpm",
     robotPhoto: safeAutoPhotoSrc(state.autoRobotPhoto),
     notes: state.autoNotes || "",
+    robotStarts: normalizeAutoRobotStarts(state.autoRobotStarts),
     updatedAt: new Date().toISOString(),
     strokes: state.autoStrokes,
   };
@@ -1425,6 +1515,7 @@ function openSavedAuto(teamKey, gameKey) {
   state.autoMotorRpm = autoRecord.motorRpm || "312rpm";
   state.autoRobotPhoto = safeAutoPhotoSrc(autoRecord.robotPhoto);
   state.autoNotes = autoRecord.notes || "";
+  state.autoRobotStarts = normalizeAutoRobotStarts(autoRecord.robotStarts);
   state.autoStrokes = normalizeAutoStrokes(autoRecord.strokes);
   state.autoCurrentStroke = null;
   state.autoSelectedPoint = null;
@@ -1454,9 +1545,11 @@ function deleteSavedAuto(teamKey, gameKey) {
     state.autoStrokes = [];
     state.autoRobotPhoto = "";
     state.autoNotes = "";
+    state.autoRobotStarts = getDefaultAutoRobotStarts();
     state.autoCurrentStroke = null;
     state.autoSelectedPoint = null;
     state.autoDraggingPoint = false;
+    state.autoDraggingStartRobot = null;
     resetAutoRobotDistances();
     renderAutoPhotoPreview();
     renderAutoCanvas();
@@ -1493,7 +1586,11 @@ function drawAutoField(ctx, width, height) {
   ctx.clearRect(0, 0, width, height);
 
   if (autoFieldImage.complete && autoFieldImage.naturalWidth > 0) {
-    ctx.drawImage(autoFieldImage, 0, 0, width, height);
+    ctx.save();
+    ctx.translate(width / 2, height / 2);
+    ctx.rotate(AUTO_FIELD_ROTATION);
+    ctx.drawImage(autoFieldImage, -width / 2, -height / 2, width, height);
+    ctx.restore();
     return;
   }
 
@@ -1666,20 +1763,24 @@ function getAutoPathSegments(robotId) {
       stroke &&
       stroke.tool !== "erase" &&
       (stroke.robot || "one") === robotId &&
-      stroke.points.length > 1,
+      stroke.points.length > 0,
   );
   const segments = [];
+  const startPoint = state.autoRobotStarts[robotId] || AUTO_ROBOTS[robotId].start;
+  let previousPoint = startPoint;
 
   strokes.forEach((stroke) => {
-    for (let index = 1; index < stroke.points.length; index += 1) {
-      const from = stroke.points[index - 1];
-      const to = stroke.points[index];
+    stroke.points.forEach((point) => {
+      const from = previousPoint;
+      const to = point;
       const length = Math.hypot(to.x - from.x, to.y - from.y);
 
       if (length > 0) {
         segments.push({ from, to, length });
       }
-    }
+
+      previousPoint = point;
+    });
   });
 
   return segments;
@@ -1691,9 +1792,15 @@ function getAutoPathLength(robotId) {
 
 function getAutoRobotPose(robotId) {
   const segments = getAutoPathSegments(robotId);
+  const startPoint = state.autoRobotStarts[robotId] || AUTO_ROBOTS[robotId].start;
 
   if (!segments.length) {
-    return null;
+    return {
+      x: startPoint.x,
+      y: startPoint.y,
+      angle: -Math.PI / 2,
+      atStart: true,
+    };
   }
 
   let remainingDistance = Math.min(state.autoRobotDistances[robotId], getAutoPathLength(robotId));

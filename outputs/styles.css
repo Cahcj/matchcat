@@ -385,30 +385,38 @@ main {
   grid-template-rows: auto auto minmax(0, 1fr);
 }
 
+.auto-menu .auto-menu__header {
+  padding: 12px 18px;
+}
+
+.auto-menu__header h2 {
+  font-size: clamp(1.25rem, 3vw, 1.8rem);
+}
+
 .auto-toolbar {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto auto;
-  gap: 10px 12px;
+  gap: 7px 10px;
   align-items: center;
   border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: 14px;
+  border-radius: 12px;
   background: rgba(14, 14, 15, 0.62);
-  margin: 10px 14px;
-  padding: 10px;
+  margin: 8px 12px;
+  padding: 8px;
 }
 
 .auto-toolbar__group {
   grid-column: 1 / -1;
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 7px;
 }
 
 .auto-toolbar__quick {
   grid-column: 1 / 2;
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 7px;
 }
 
 .auto-header-hint {
@@ -419,15 +427,15 @@ main {
 }
 
 .tool-button {
-  min-height: 38px;
+  min-height: 32px;
   border: 1px solid rgba(255, 255, 255, 0.11);
-  border-radius: 11px;
+  border-radius: 9px;
   background: rgba(31, 31, 32, 0.92);
   color: var(--ink);
   font: inherit;
-  font-size: 0.82rem;
+  font-size: 0.76rem;
   font-weight: 900;
-  padding: 0 12px;
+  padding: 0 10px;
   cursor: pointer;
   transition:
     background 160ms ease,
@@ -449,8 +457,8 @@ main {
 }
 
 .tool-button--icon {
-  min-width: 54px;
-  padding: 0 10px;
+  min-width: 44px;
+  padding: 0 8px;
 }
 
 .tool-button:hover,
@@ -471,20 +479,20 @@ main {
 .auto-toolbar label {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: 8px;
+  gap: 6px;
   align-items: center;
   color: var(--muted);
-  font-size: 0.82rem;
+  font-size: 0.75rem;
   font-weight: 850;
 }
 
 .auto-toolbar input[type="color"] {
-  width: 52px;
-  height: 38px;
+  width: 42px;
+  height: 32px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--panel-soft);
-  padding: 4px;
+  padding: 3px;
 }
 
 .auto-toolbar input[type="range"] {
@@ -496,21 +504,21 @@ main {
   grid-column: 2 / -1;
   margin: 0;
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 800;
 }
 
 .auto-cloud-status {
   grid-column: 2 / -1;
-  margin: -4px 0 0;
+  margin: -3px 0 0;
   border: 1px solid rgba(35, 136, 217, 0.28);
-  border-radius: 12px;
+  border-radius: 10px;
   background: rgba(35, 136, 217, 0.08);
   color: rgba(246, 247, 251, 0.84);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 850;
   line-height: 1.35;
-  padding: 9px 12px;
+  padding: 7px 10px;
 }
 
 .auto-cloud-status[data-mode="on"] {
@@ -531,9 +539,9 @@ main {
 
 .auto-path-hint {
   grid-column: 2 / -1;
-  margin: -4px 0 0;
+  margin: -3px 0 0;
   color: rgba(246, 247, 251, 0.66);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 800;
 }
 
@@ -545,12 +553,12 @@ main {
   background: rgba(11, 11, 12, 0.72);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 14px;
-  margin: 0 14px 14px;
-  padding: 12px;
+  margin: 0 12px 12px;
+  padding: 10px;
 }
 
 #auto-canvas {
-  width: min(100%, 760px, calc(100vh - 238px));
+  width: min(100%, 820px, calc(100vh - 196px));
   aspect-ratio: 1;
   height: auto;
   border: 1px solid rgba(25, 195, 125, 0.18);
@@ -1748,9 +1756,9 @@ tbody tr:hover {
 
   .auto-toolbar {
     grid-template-columns: 1fr;
-    gap: 10px;
-    margin: 10px;
-    padding: 10px;
+    gap: 7px;
+    margin: 8px;
+    padding: 8px;
   }
 
   .auto-toolbar__group {
@@ -1771,16 +1779,17 @@ tbody tr:hover {
   }
 
   .tool-button {
-    padding: 0 8px;
+    min-height: 31px;
+    padding: 0 7px;
   }
 
   .auto-stage {
-    margin: 0 10px 10px;
-    padding: 12px;
+    margin: 0 8px 8px;
+    padding: 8px;
   }
 
   #auto-canvas {
-    width: min(100%, calc(100vh - 312px));
+    width: min(100%, calc(100vh - 244px));
   }
 
   .picks-menu__controls,
