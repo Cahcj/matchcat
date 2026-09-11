@@ -13,6 +13,7 @@ const AUTO_ROBOT_HEIGHT = 192;
 const AUTO_ROBOT_SPEED = 430;
 const AUTO_MIN_LINE_DRAG_DISTANCE = 14;
 const AUTO_FIELD_ROTATION = Math.PI / 2;
+const AUTO_STARTER_LINE_LENGTH = 260;
 const AUTO_ROBOTS = {
   one: {
     label: "7305",
@@ -894,13 +895,14 @@ function undoAutoStroke() {
 
 function clearAutoCanvas() {
   stopAutoPath();
-  state.autoStrokes = [];
   state.autoCurrentStroke = null;
   state.autoSelectedPoint = null;
   state.autoDraggingPoint = false;
   state.autoDraggingStartRobot = null;
   state.autoDrawing = false;
   state.autoRobotStarts = getDefaultAutoRobotStarts();
+  state.autoStrokes = createStarterAutoStrokes();
+  state.autoSelectedPoint = { strokeIndex: 0, pointIndex: 0 };
   resetAutoRobotDistances();
   saveAutoDrawing({ silent: true });
   renderAutoCanvas();
@@ -990,6 +992,25 @@ function getDefaultAutoRobotStarts() {
       { x: robot.start.x, y: robot.start.y },
     ]),
   );
+}
+
+function createStarterAutoStrokes() {
+  const robotId = "one";
+  const start = state.autoRobotStarts?.[robotId] || AUTO_ROBOTS[robotId].start;
+  const margin = AUTO_ROBOT_HEIGHT / 2;
+  const point = {
+    x: start.x,
+    y: Math.max(margin, start.y - AUTO_STARTER_LINE_LENGTH),
+  };
+
+  return [{
+    tool: "draw",
+    mode: "path",
+    robot: robotId,
+    color: els.autoColor?.value || "#19c37d",
+    size: Number(els.autoSize?.value) || 9,
+    points: [point],
+  }];
 }
 
 function normalizeAutoRobotStarts(starts) {
@@ -1425,8 +1446,12 @@ function loadAutoDrawingForTeam(
   state.autoNotes = notes || savedAuto?.notes || "";
   state.autoRobotStarts = normalizeAutoRobotStarts(savedAuto?.robotStarts);
   state.autoStrokes = normalizeAutoStrokes(savedAuto?.strokes);
-  state.autoCurrentStroke = null;
   state.autoSelectedPoint = null;
+  if (!state.autoStrokes.length) {
+    state.autoStrokes = createStarterAutoStrokes();
+    state.autoSelectedPoint = { strokeIndex: 0, pointIndex: 0 };
+  }
+  state.autoCurrentStroke = null;
   state.autoDraggingPoint = false;
   state.autoDrawing = false;
   resetAutoRobotDistances();
@@ -1514,8 +1539,12 @@ function openSavedAuto(teamKey, gameKey) {
   state.autoNotes = autoRecord.notes || "";
   state.autoRobotStarts = normalizeAutoRobotStarts(autoRecord.robotStarts);
   state.autoStrokes = normalizeAutoStrokes(autoRecord.strokes);
-  state.autoCurrentStroke = null;
   state.autoSelectedPoint = null;
+  if (!state.autoStrokes.length) {
+    state.autoStrokes = createStarterAutoStrokes();
+    state.autoSelectedPoint = { strokeIndex: 0, pointIndex: 0 };
+  }
+  state.autoCurrentStroke = null;
   state.autoDraggingPoint = false;
   state.autoDrawing = false;
   resetAutoRobotDistances();
@@ -1640,12 +1669,11 @@ function drawAutoStroke(ctx, stroke) {
   ctx.shadowColor = stroke.color || "rgba(25, 195, 125, 0.5)";
   ctx.shadowBlur = stroke.tool === "erase" ? 0 : 14;
 
-  if (stroke.points.length > 1) {
-    ctx.beginPath();
-    ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-    stroke.points.slice(1).forEach((point) => ctx.lineTo(point.x, point.y));
-    ctx.stroke();
-  }
+  const startPoint = getAutoStrokeStartPoint(stroke);
+  ctx.beginPath();
+  ctx.moveTo(startPoint.x, startPoint.y);
+  stroke.points.forEach((point) => ctx.lineTo(point.x, point.y));
+  ctx.stroke();
 
   ctx.shadowBlur = 0;
   if (stroke.tool !== "erase" && (stroke.mode === "path" || stroke.points.length <= 12)) {
@@ -1653,6 +1681,27 @@ function drawAutoStroke(ctx, stroke) {
   }
 
   ctx.restore();
+}
+
+function getAutoStrokeStartPoint(stroke) {
+  const robotId = stroke.robot || "one";
+  const strokeIndex = state.autoStrokes.indexOf(stroke);
+  const previousPoint = { ...(state.autoRobotStarts[robotId] || AUTO_ROBOTS[robotId].start) };
+
+  if (strokeIndex < 0) {
+    const lastPoint = getLastAutoPointForRobot(robotId);
+    return lastPoint || previousPoint;
+  }
+
+  for (let index = 0; index < strokeIndex; index += 1) {
+    const candidate = state.autoStrokes[index];
+    if (!isEditableAutoPath(candidate) || (candidate.robot || "one") !== robotId || !candidate.points.length) continue;
+    const point = candidate.points[candidate.points.length - 1];
+    previousPoint.x = point.x;
+    previousPoint.y = point.y;
+  }
+
+  return previousPoint;
 }
 
 function drawAutoControlPoints(ctx, stroke) {
