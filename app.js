@@ -8,16 +8,16 @@ const CLOUD_SYNC_INTERVAL = 45000;
 const DATA_CACHE_NAME = "matchcat-api-cache-v1";
 const DATA_CACHE_META_KEY = "matchcat:data-cache-meta:v1";
 const OFFLINE_REFRESH_DELAY = 900;
-const AUTO_ROBOT_SIZE = 58;
-const AUTO_ROBOT_HEIGHT = 74;
+const AUTO_ROBOT_SIZE = 240;
+const AUTO_ROBOT_HEIGHT = 240;
 const AUTO_ROBOT_SPEED = 430;
 const AUTO_MIN_LINE_DRAG_DISTANCE = 14;
-const AUTO_FIELD_ROTATION = Math.PI;
+const AUTO_FIELD_ROTATION = Math.PI / 2;
 const AUTO_ROBOTS = {
   one: {
     label: "7305",
     color: "#ff3fae",
-    start: { x: 720, y: 1205 },
+    start: { x: 720, y: 1200 },
   },
 };
 const GAME_SEASONS = {
@@ -1006,9 +1006,12 @@ function normalizeAutoRobotStarts(starts) {
 }
 
 function clampAutoPoint(point) {
+  const xMargin = AUTO_ROBOT_SIZE / 2;
+  const yMargin = AUTO_ROBOT_HEIGHT / 2;
+
   return {
-    x: Math.max(0, Math.min(els.autoCanvas.width, point.x)),
-    y: Math.max(0, Math.min(els.autoCanvas.height, point.y)),
+    x: Math.max(xMargin, Math.min(els.autoCanvas.width - xMargin, point.x)),
+    y: Math.max(yMargin, Math.min(els.autoCanvas.height - yMargin, point.y)),
   };
 }
 
@@ -1830,41 +1833,46 @@ function drawAutoRobot(ctx, robotId) {
   const robot = AUTO_ROBOTS[robotId];
   const width = AUTO_ROBOT_SIZE;
   const height = AUTO_ROBOT_HEIGHT;
-  const stripeInset = 9;
+  const outlineWidth = width * 0.045;
+  const innerInset = width * 0.13;
+  const stripeInset = width * 0.12;
+  const stripeStep = height * 0.155;
+  const stripeLength = width * 0.22;
+  const railWidth = width * 0.09;
 
   ctx.save();
   ctx.translate(pose.x, pose.y);
   ctx.rotate(pose.angle);
   ctx.shadowColor = "rgba(0, 0, 0, 0.55)";
-  ctx.shadowBlur = 18;
+  ctx.shadowBlur = 24;
   ctx.fillStyle = "rgba(8, 8, 10, 0.48)";
   ctx.strokeStyle = robot.color;
-  ctx.lineWidth = 5;
+  ctx.lineWidth = outlineWidth;
   ctx.strokeRect(-width / 2, -height / 2, width, height);
-  ctx.fillRect(-width / 2 + 5, -height / 2 + 5, width - 10, height - 10);
+  ctx.fillRect(-width / 2 + outlineWidth, -height / 2 + outlineWidth, width - outlineWidth * 2, height - outlineWidth * 2);
   ctx.shadowBlur = 0;
 
-  ctx.lineWidth = 3;
+  ctx.lineWidth = Math.max(4, width * 0.026);
   ctx.strokeStyle = "rgba(255, 255, 255, 0.78)";
-  ctx.strokeRect(-width / 2 + 8, -height / 2 + 8, width - 16, height - 16);
+  ctx.strokeRect(-width / 2 + innerInset, -height / 2 + innerInset, width - innerInset * 2, height - innerInset * 2);
 
   ctx.strokeStyle = robot.color;
-  ctx.lineWidth = 3;
-  for (let y = -height / 2 + 9; y < height / 2 - 9; y += 12) {
+  ctx.lineWidth = Math.max(4, width * 0.026);
+  for (let y = -height / 2 + innerInset; y < height / 2 - innerInset; y += stripeStep) {
     ctx.beginPath();
     ctx.moveTo(-width / 2 + stripeInset, y);
-    ctx.lineTo(-width / 2 + stripeInset + 12, y + 12);
+    ctx.lineTo(-width / 2 + stripeInset + stripeLength, y + stripeStep);
     ctx.stroke();
 
     ctx.beginPath();
-    ctx.moveTo(width / 2 - stripeInset - 12, y);
-    ctx.lineTo(width / 2 - stripeInset, y + 12);
+    ctx.moveTo(width / 2 - stripeInset - stripeLength, y);
+    ctx.lineTo(width / 2 - stripeInset, y + stripeStep);
     ctx.stroke();
   }
 
   ctx.fillStyle = "rgba(255, 63, 174, 0.9)";
-  ctx.fillRect(-width / 2 + 4, -height / 2 + 4, 7, height - 8);
-  ctx.fillRect(width / 2 - 11, -height / 2 + 4, 7, height - 8);
+  ctx.fillRect(-width / 2 + outlineWidth, -height / 2 + outlineWidth, railWidth, height - outlineWidth * 2);
+  ctx.fillRect(width / 2 - outlineWidth - railWidth, -height / 2 + outlineWidth, railWidth, height - outlineWidth * 2);
   ctx.restore();
 }
 
