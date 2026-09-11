@@ -10,6 +10,7 @@ const DATA_CACHE_META_KEY = "matchcat:data-cache-meta:v1";
 const OFFLINE_REFRESH_DELAY = 900;
 const AUTO_ROBOT_SIZE = 78;
 const AUTO_ROBOT_SPEED = 430;
+const AUTO_MIN_LINE_DRAG_DISTANCE = 14;
 const AUTO_ROBOTS = {
   one: {
     label: "7305 A",
@@ -800,7 +801,7 @@ function continueAutoPointDrag(event) {
     const nextPoint = getAutoCanvasPoint(event);
     const distance = Math.hypot(nextPoint.x - state.autoDragStartPoint.x, nextPoint.y - state.autoDragStartPoint.y);
 
-    if (distance < 14) return;
+    if (distance < AUTO_MIN_LINE_DRAG_DISTANCE) return;
 
     addAutoControlPoint(nextPoint);
     state.autoDraggingPoint = true;
@@ -1232,6 +1233,7 @@ function normalizeAutoTeamRecord(teamKey, record) {
         ...autoRecord,
         robotPhoto: safeAutoPhotoSrc(autoRecord?.robotPhoto),
         notes: autoRecord?.notes || "",
+        strokes: normalizeAutoStrokes(autoRecord?.strokes),
       };
     });
 
@@ -1256,7 +1258,7 @@ function normalizeAutoTeamRecord(teamKey, record) {
           robotPhoto: safeAutoPhotoSrc(record.robotPhoto),
           notes: record.notes || "",
           updatedAt: record.updatedAt || "",
-          strokes: record.strokes,
+          strokes: normalizeAutoStrokes(record.strokes),
         },
       },
     };
@@ -1267,6 +1269,52 @@ function normalizeAutoTeamRecord(teamKey, record) {
     updatedAt: "",
     autos: {},
   };
+}
+
+function normalizeAutoStrokes(strokes) {
+  if (!Array.isArray(strokes)) return [];
+
+  return strokes
+    .map(normalizeAutoStroke)
+    .filter(Boolean);
+}
+
+function normalizeAutoStroke(stroke) {
+  if (!stroke || stroke.tool === "erase" || !Array.isArray(stroke.points)) return null;
+
+  const points = stroke.points
+    .map(normalizeAutoPoint)
+    .filter(Boolean)
+    .filter((point, index, list) => {
+      if (index === 0) return true;
+      const previous = list[index - 1];
+      return Math.hypot(point.x - previous.x, point.y - previous.y) >= 2;
+    });
+
+  if (!points.length) return null;
+
+  const isLegacyFreehand = stroke.mode !== "path";
+  const linePoints = isLegacyFreehand && points.length > 1
+    ? [points[0], points[points.length - 1]]
+    : points;
+
+  return {
+    tool: "draw",
+    mode: "path",
+    robot: stroke.robot === "two" ? "two" : "one",
+    color: typeof stroke.color === "string" ? stroke.color : AUTO_ROBOTS.one.color,
+    size: Number.isFinite(Number(stroke.size)) ? Number(stroke.size) : 9,
+    points: linePoints,
+  };
+}
+
+function normalizeAutoPoint(point) {
+  const x = Number(point?.x);
+  const y = Number(point?.y);
+
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+
+  return { x, y };
 }
 
 function loadAutoDrawingForTeam(
@@ -1290,7 +1338,7 @@ function loadAutoDrawingForTeam(
   state.autoMotorRpm = savedAuto?.motorRpm || motorRpm;
   state.autoRobotPhoto = safeAutoPhotoSrc(robotPhoto) || safeAutoPhotoSrc(savedAuto?.robotPhoto);
   state.autoNotes = notes || savedAuto?.notes || "";
-  state.autoStrokes = Array.isArray(savedAuto?.strokes) ? savedAuto.strokes : [];
+  state.autoStrokes = normalizeAutoStrokes(savedAuto?.strokes);
   state.autoCurrentStroke = null;
   state.autoSelectedPoint = null;
   state.autoDraggingPoint = false;
@@ -1312,6 +1360,7 @@ function saveAutoDrawing(options = {}) {
 
   const storage = getAutoStorage();
   const gameKey = state.autoGameKey || getDefaultAutoGameKey();
+  state.autoStrokes = normalizeAutoStrokes(state.autoStrokes);
   storage[state.autoTeamKey] = storage[state.autoTeamKey] || {
     label: state.autoTeamLabel,
     updatedAt: "",
@@ -1376,7 +1425,7 @@ function openSavedAuto(teamKey, gameKey) {
   state.autoMotorRpm = autoRecord.motorRpm || "312rpm";
   state.autoRobotPhoto = safeAutoPhotoSrc(autoRecord.robotPhoto);
   state.autoNotes = autoRecord.notes || "";
-  state.autoStrokes = Array.isArray(autoRecord.strokes) ? autoRecord.strokes : [];
+  state.autoStrokes = normalizeAutoStrokes(autoRecord.strokes);
   state.autoCurrentStroke = null;
   state.autoSelectedPoint = null;
   state.autoDraggingPoint = false;
