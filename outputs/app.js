@@ -8,20 +8,16 @@ const CLOUD_SYNC_INTERVAL = 45000;
 const DATA_CACHE_NAME = "matchcat-api-cache-v1";
 const DATA_CACHE_META_KEY = "matchcat:data-cache-meta:v1";
 const OFFLINE_REFRESH_DELAY = 900;
-const AUTO_ROBOT_SIZE = 78;
+const AUTO_ROBOT_SIZE = 58;
+const AUTO_ROBOT_HEIGHT = 74;
 const AUTO_ROBOT_SPEED = 430;
 const AUTO_MIN_LINE_DRAG_DISTANCE = 14;
 const AUTO_FIELD_ROTATION = Math.PI;
 const AUTO_ROBOTS = {
   one: {
-    label: "7305 A",
-    color: "#19c37d",
-    start: { x: 350, y: 1180 },
-  },
-  two: {
-    label: "7305 B",
-    color: "#2388d9",
-    start: { x: 1090, y: 1180 },
+    label: "7305",
+    color: "#ff3fae",
+    start: { x: 720, y: 1205 },
   },
 };
 const GAME_SEASONS = {
@@ -170,7 +166,6 @@ const els = {
   autoMenuPhotoImg: document.querySelector("#auto-menu-photo-img"),
   autoCanvas: document.querySelector("#auto-canvas"),
   autoRobotOne: document.querySelector("#auto-robot-one"),
-  autoRobotTwo: document.querySelector("#auto-robot-two"),
   autoDraw: document.querySelector("#auto-draw"),
   autoErase: document.querySelector("#auto-erase"),
   autoConnect: document.querySelector("#auto-connect"),
@@ -304,7 +299,6 @@ els.autoTeamTest.addEventListener("click", () => {
 els.autoPhotoInput.addEventListener("change", handleAutoPhotoInput);
 els.autoPhotoClear.addEventListener("click", clearAutoPhoto);
 els.autoRobotOne.addEventListener("click", () => setAutoRobot("one"));
-els.autoRobotTwo.addEventListener("click", () => setAutoRobot("two"));
 els.autoDraw.addEventListener("click", startNewAutoPath);
 els.autoErase.addEventListener("click", () => setAutoTool("point"));
 els.autoConnect.addEventListener("click", createPathToLastPoint);
@@ -702,11 +696,11 @@ function setAutoTool(tool) {
 }
 
 function setAutoRobot(robotId) {
-  state.autoSelectedRobot = robotId;
+  const nextRobotId = AUTO_ROBOTS[robotId] ? robotId : "one";
+  state.autoSelectedRobot = nextRobotId;
   state.autoSelectedPoint = null;
-  els.autoRobotOne.classList.toggle("is-active", robotId === "one");
-  els.autoRobotTwo.classList.toggle("is-active", robotId === "two");
-  els.autoColor.value = AUTO_ROBOTS[robotId].color;
+  els.autoRobotOne.classList.toggle("is-active", nextRobotId === "one");
+  els.autoColor.value = AUTO_ROBOTS[nextRobotId].color;
   renderAutoCanvas();
 }
 
@@ -1019,7 +1013,7 @@ function clampAutoPoint(point) {
 }
 
 function findAutoRobotStart(targetPoint) {
-  const hitRadius = AUTO_ROBOT_SIZE * 0.72;
+  const hitRadius = Math.max(AUTO_ROBOT_SIZE, AUTO_ROBOT_HEIGHT) * 0.68;
   let best = null;
 
   Object.keys(AUTO_ROBOTS).forEach((robotId) => {
@@ -1389,7 +1383,7 @@ function normalizeAutoStroke(stroke) {
   return {
     tool: "draw",
     mode: "path",
-    robot: stroke.robot === "two" ? "two" : "one",
+    robot: "one",
     color: typeof stroke.color === "string" ? stroke.color : AUTO_ROBOTS.one.color,
     size: Number.isFinite(Number(stroke.size)) ? Number(stroke.size) : 9,
     points: linePoints,
@@ -1834,23 +1828,43 @@ function drawAutoRobot(ctx, robotId) {
   }
 
   const robot = AUTO_ROBOTS[robotId];
+  const width = AUTO_ROBOT_SIZE;
+  const height = AUTO_ROBOT_HEIGHT;
+  const stripeInset = 9;
 
   ctx.save();
   ctx.translate(pose.x, pose.y);
   ctx.rotate(pose.angle);
   ctx.shadowColor = "rgba(0, 0, 0, 0.55)";
-  ctx.shadowBlur = 24;
-  ctx.fillStyle = robot.color;
-  ctx.strokeStyle = "#f6f7fb";
-  ctx.lineWidth = 7;
-  ctx.fillRect(-AUTO_ROBOT_SIZE / 2, -AUTO_ROBOT_SIZE / 2, AUTO_ROBOT_SIZE, AUTO_ROBOT_SIZE);
-  ctx.strokeRect(-AUTO_ROBOT_SIZE / 2, -AUTO_ROBOT_SIZE / 2, AUTO_ROBOT_SIZE, AUTO_ROBOT_SIZE);
+  ctx.shadowBlur = 18;
+  ctx.fillStyle = "rgba(8, 8, 10, 0.48)";
+  ctx.strokeStyle = robot.color;
+  ctx.lineWidth = 5;
+  ctx.strokeRect(-width / 2, -height / 2, width, height);
+  ctx.fillRect(-width / 2 + 5, -height / 2 + 5, width - 10, height - 10);
   ctx.shadowBlur = 0;
-  ctx.fillStyle = "#06130d";
-  ctx.font = "900 18px Inter, sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(robot.label, 0, 0);
+
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.78)";
+  ctx.strokeRect(-width / 2 + 8, -height / 2 + 8, width - 16, height - 16);
+
+  ctx.strokeStyle = robot.color;
+  ctx.lineWidth = 3;
+  for (let y = -height / 2 + 9; y < height / 2 - 9; y += 12) {
+    ctx.beginPath();
+    ctx.moveTo(-width / 2 + stripeInset, y);
+    ctx.lineTo(-width / 2 + stripeInset + 12, y + 12);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(width / 2 - stripeInset - 12, y);
+    ctx.lineTo(width / 2 - stripeInset, y + 12);
+    ctx.stroke();
+  }
+
+  ctx.fillStyle = "rgba(255, 63, 174, 0.9)";
+  ctx.fillRect(-width / 2 + 4, -height / 2 + 4, 7, height - 8);
+  ctx.fillRect(width / 2 - 11, -height / 2 + 4, 7, height - 8);
   ctx.restore();
 }
 
