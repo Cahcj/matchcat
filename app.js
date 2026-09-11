@@ -68,11 +68,13 @@ const state = {
   rankingEventFilter: "",
   simEventFilter: "",
   simPartnerTeam: "",
-  autoTool: "draw",
+  autoTool: "point",
   autoSelectedRobot: "one",
   autoDrawing: false,
   autoStrokes: [],
   autoCurrentStroke: null,
+  autoSelectedPoint: null,
+  autoDraggingPoint: false,
   autoRobotPlaying: false,
   autoRobotDistances: {
     one: 0,
@@ -294,19 +296,19 @@ els.autoPhotoInput.addEventListener("change", handleAutoPhotoInput);
 els.autoPhotoClear.addEventListener("click", clearAutoPhoto);
 els.autoRobotOne.addEventListener("click", () => setAutoRobot("one"));
 els.autoRobotTwo.addEventListener("click", () => setAutoRobot("two"));
-els.autoDraw.addEventListener("click", () => setAutoTool("draw"));
-els.autoErase.addEventListener("click", () => setAutoTool("erase"));
+els.autoDraw.addEventListener("click", startNewAutoPath);
+els.autoErase.addEventListener("click", () => setAutoTool("point"));
 els.autoPlay.addEventListener("click", playAutoPath);
-els.autoStop.addEventListener("click", stopAutoPath);
+els.autoStop.addEventListener("click", removeSelectedAutoPoint);
 els.autoUndo.addEventListener("click", undoAutoStroke);
 els.autoClear.addEventListener("click", clearAutoCanvas);
 els.autoSave.addEventListener("click", () => saveAutoDrawing());
 els.autoDownload.addEventListener("click", downloadAutoCanvas);
-els.autoCanvas.addEventListener("pointerdown", startAutoStroke);
-els.autoCanvas.addEventListener("pointermove", continueAutoStroke);
-els.autoCanvas.addEventListener("pointerup", endAutoStroke);
-els.autoCanvas.addEventListener("pointercancel", endAutoStroke);
-els.autoCanvas.addEventListener("pointerleave", endAutoStroke);
+els.autoCanvas.addEventListener("pointerdown", startAutoPointDrag);
+els.autoCanvas.addEventListener("pointermove", continueAutoPointDrag);
+els.autoCanvas.addEventListener("pointerup", endAutoPointDrag);
+els.autoCanvas.addEventListener("pointercancel", endAutoPointDrag);
+els.autoCanvas.addEventListener("pointerleave", endAutoPointDrag);
 
 function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
@@ -543,7 +545,7 @@ function closeAutoTeamMenu() {
 }
 
 function closeAutoMenu() {
-  endAutoStroke();
+  endAutoPointDrag();
   saveAutoDrawing({ silent: true });
   document.body.classList.remove("auto-open");
   els.autoMenu.hidden = true;
@@ -685,56 +687,103 @@ function updateAutoHeader() {
 
 function setAutoTool(tool) {
   state.autoTool = tool;
-  els.autoDraw.classList.toggle("is-active", tool === "draw");
-  els.autoErase.classList.toggle("is-active", tool === "erase");
+  els.autoDraw.classList.toggle("is-active", tool === "path");
+  els.autoErase.classList.toggle("is-active", tool === "point");
 }
 
 function setAutoRobot(robotId) {
   state.autoSelectedRobot = robotId;
+  state.autoSelectedPoint = null;
   els.autoRobotOne.classList.toggle("is-active", robotId === "one");
   els.autoRobotTwo.classList.toggle("is-active", robotId === "two");
   els.autoColor.value = AUTO_ROBOTS[robotId].color;
+  renderAutoCanvas();
 }
 
-function startAutoStroke(event) {
-  event.preventDefault();
+function startNewAutoPath() {
   stopAutoPath();
-  const point = getAutoCanvasPoint(event);
-  state.autoDrawing = true;
-  state.autoCurrentStroke = {
-    tool: state.autoTool,
+  const stroke = {
+    tool: "draw",
+    mode: "path",
     robot: state.autoSelectedRobot,
     color: els.autoColor.value,
     size: Number(els.autoSize.value),
-    points: [point],
+    points: [],
   };
+  state.autoStrokes.push(stroke);
+  state.autoSelectedPoint = {
+    strokeIndex: state.autoStrokes.length - 1,
+    pointIndex: -1,
+  };
+  setAutoTool("path");
+  els.autoSaveStatus.textContent = `New ${AUTO_ROBOTS[state.autoSelectedRobot].label} path started. Click the field to add points.`;
+  saveAutoDrawing({ silent: true });
+  renderAutoCanvas();
+}
+
+function startAutoPointDrag(event) {
+  event.preventDefault();
+  stopAutoPath();
+  const point = getAutoCanvasPoint(event);
+  const hitPoint = findAutoPoint(point);
+
+  if (hitPoint) {
+    state.autoSelectedPoint = hitPoint;
+    state.autoDraggingPoint = true;
+  } else {
+    addAutoControlPoint(point);
+    state.autoDraggingPoint = true;
+  }
+
   els.autoCanvas.setPointerCapture(event.pointerId);
   renderAutoCanvas();
 }
 
-function continueAutoStroke(event) {
-  if (!state.autoDrawing || !state.autoCurrentStroke) return;
+function continueAutoPointDrag(event) {
+  if (!state.autoDraggingPoint || !state.autoSelectedPoint) return;
 
   event.preventDefault();
-  state.autoCurrentStroke.points.push(getAutoCanvasPoint(event));
+  const stroke = state.autoStrokes[state.autoSelectedPoint.strokeIndex];
+  const point = stroke?.points?.[state.autoSelectedPoint.pointIndex];
+
+  if (!point) return;
+
+  const nextPoint = getAutoCanvasPoint(event);
+  point.x = nextPoint.x;
+  point.y = nextPoint.y;
   renderAutoCanvas();
 }
 
-function endAutoStroke() {
-  if (!state.autoDrawing || !state.autoCurrentStroke) return;
-
-  if (state.autoCurrentStroke.points.length > 1) {
-    state.autoStrokes.push(state.autoCurrentStroke);
+function endAutoPointDrag() {
+  if (!state.autoDraggingPoint) {
+    return;
   }
-  state.autoDrawing = false;
-  state.autoCurrentStroke = null;
+
+  state.autoDraggingPoint = false;
   saveAutoDrawing({ silent: true });
   renderAutoCanvas();
 }
 
 function undoAutoStroke() {
   stopAutoPath();
-  state.autoStrokes.pop();
+  const activePath = getActiveAutoPath(false);
+
+  if (activePath?.points?.length) {
+    activePath.points.pop();
+    if (!activePath.points.length) {
+      removeEmptyAutoPaths();
+      state.autoSelectedPoint = null;
+    } else {
+      state.autoSelectedPoint = {
+        strokeIndex: state.autoStrokes.indexOf(activePath),
+        pointIndex: activePath.points.length - 1,
+      };
+    }
+  } else {
+    state.autoStrokes.pop();
+    state.autoSelectedPoint = null;
+  }
+
   resetAutoRobotDistances();
   saveAutoDrawing({ silent: true });
   renderAutoCanvas();
@@ -744,10 +793,111 @@ function clearAutoCanvas() {
   stopAutoPath();
   state.autoStrokes = [];
   state.autoCurrentStroke = null;
+  state.autoSelectedPoint = null;
+  state.autoDraggingPoint = false;
   state.autoDrawing = false;
   resetAutoRobotDistances();
   saveAutoDrawing({ silent: true });
   renderAutoCanvas();
+}
+
+function addAutoControlPoint(point) {
+  const stroke = getActiveAutoPath(true);
+  const strokeIndex = state.autoStrokes.indexOf(stroke);
+  const insertAfter = state.autoSelectedPoint?.strokeIndex === strokeIndex
+    ? state.autoSelectedPoint.pointIndex
+    : stroke.points.length - 1;
+  const pointIndex = Math.max(0, insertAfter + 1);
+
+  stroke.color = els.autoColor.value;
+  stroke.size = Number(els.autoSize.value);
+  stroke.points.splice(pointIndex, 0, point);
+  state.autoSelectedPoint = { strokeIndex, pointIndex };
+  setAutoTool("point");
+  saveAutoDrawing({ silent: true });
+}
+
+function removeSelectedAutoPoint() {
+  stopAutoPath();
+
+  if (!state.autoSelectedPoint) {
+    const activePath = getActiveAutoPath(false);
+    if (activePath?.points?.length) {
+      state.autoSelectedPoint = {
+        strokeIndex: state.autoStrokes.indexOf(activePath),
+        pointIndex: activePath.points.length - 1,
+      };
+    }
+  }
+
+  if (!state.autoSelectedPoint) {
+    els.autoSaveStatus.textContent = "Select a control point to remove.";
+    return;
+  }
+
+  const stroke = state.autoStrokes[state.autoSelectedPoint.strokeIndex];
+  if (!stroke?.points?.[state.autoSelectedPoint.pointIndex]) return;
+
+  stroke.points.splice(state.autoSelectedPoint.pointIndex, 1);
+  if (!stroke.points.length) {
+    state.autoStrokes.splice(state.autoSelectedPoint.strokeIndex, 1);
+    state.autoSelectedPoint = null;
+  } else {
+    state.autoSelectedPoint.pointIndex = Math.min(state.autoSelectedPoint.pointIndex, stroke.points.length - 1);
+  }
+
+  resetAutoRobotDistances();
+  saveAutoDrawing({ silent: true });
+  renderAutoCanvas();
+}
+
+function getActiveAutoPath(createIfMissing = false) {
+  const selectedStroke = state.autoSelectedPoint
+    ? state.autoStrokes[state.autoSelectedPoint.strokeIndex]
+    : null;
+
+  if (isEditableAutoPath(selectedStroke) && (selectedStroke.robot || "one") === state.autoSelectedRobot) {
+    return selectedStroke;
+  }
+
+  const existing = [...state.autoStrokes].reverse().find((stroke) =>
+    isEditableAutoPath(stroke) && (stroke.robot || "one") === state.autoSelectedRobot,
+  );
+
+  if (existing || !createIfMissing) return existing;
+
+  startNewAutoPath();
+  return state.autoStrokes[state.autoStrokes.length - 1];
+}
+
+function isEditableAutoPath(stroke) {
+  return stroke && stroke.tool !== "erase" && Array.isArray(stroke.points);
+}
+
+function removeEmptyAutoPaths() {
+  state.autoStrokes = state.autoStrokes.filter((stroke) => !isEditableAutoPath(stroke) || stroke.points.length);
+}
+
+function findAutoPoint(targetPoint) {
+  const hitRadius = 34;
+  let best = null;
+
+  state.autoStrokes.forEach((stroke, strokeIndex) => {
+    if (!isEditableAutoPath(stroke)) return;
+
+    stroke.points.forEach((point, pointIndex) => {
+      const distance = Math.hypot(point.x - targetPoint.x, point.y - targetPoint.y);
+      if (distance <= hitRadius && (!best || distance < best.distance)) {
+        best = {
+          strokeIndex,
+          pointIndex,
+          distance,
+        };
+      }
+    });
+  });
+
+  return best ? { strokeIndex: best.strokeIndex, pointIndex: best.pointIndex } : null;
 }
 
 function downloadAutoCanvas() {
@@ -1072,6 +1222,8 @@ function loadAutoDrawingForTeam(
   state.autoNotes = notes || savedAuto?.notes || "";
   state.autoStrokes = Array.isArray(savedAuto?.strokes) ? savedAuto.strokes : [];
   state.autoCurrentStroke = null;
+  state.autoSelectedPoint = null;
+  state.autoDraggingPoint = false;
   state.autoDrawing = false;
   resetAutoRobotDistances();
   updateAutoHeader();
@@ -1156,6 +1308,8 @@ function openSavedAuto(teamKey, gameKey) {
   state.autoNotes = autoRecord.notes || "";
   state.autoStrokes = Array.isArray(autoRecord.strokes) ? autoRecord.strokes : [];
   state.autoCurrentStroke = null;
+  state.autoSelectedPoint = null;
+  state.autoDraggingPoint = false;
   state.autoDrawing = false;
   resetAutoRobotDistances();
   openAutoMenu();
@@ -1182,6 +1336,8 @@ function deleteSavedAuto(teamKey, gameKey) {
     state.autoRobotPhoto = "";
     state.autoNotes = "";
     state.autoCurrentStroke = null;
+    state.autoSelectedPoint = null;
+    state.autoDraggingPoint = false;
     resetAutoRobotDistances();
     renderAutoPhotoPreview();
     renderAutoCanvas();
@@ -1261,21 +1417,60 @@ function drawAutoField(ctx, width, height) {
 }
 
 function drawAutoStroke(ctx, stroke) {
-  if (stroke.points.length < 2) return;
+  if (!Array.isArray(stroke.points) || !stroke.points.length) return;
 
   ctx.save();
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
-  ctx.lineWidth = stroke.tool === "erase" ? Math.max(stroke.size * 2.4, 24) : stroke.size;
+  ctx.lineWidth = Math.max(6, Number(stroke.size) || 9);
   ctx.strokeStyle = stroke.tool === "erase" ? "#101011" : stroke.color;
-  ctx.beginPath();
-  ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-  stroke.points.slice(1).forEach((point) => ctx.lineTo(point.x, point.y));
-  ctx.stroke();
+  ctx.shadowColor = stroke.color || "rgba(25, 195, 125, 0.5)";
+  ctx.shadowBlur = stroke.tool === "erase" ? 0 : 14;
+
+  if (stroke.points.length > 1) {
+    ctx.beginPath();
+    ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+    stroke.points.slice(1).forEach((point) => ctx.lineTo(point.x, point.y));
+    ctx.stroke();
+  }
+
+  ctx.shadowBlur = 0;
+  if (stroke.tool !== "erase" && (stroke.mode === "path" || stroke.points.length <= 12)) {
+    drawAutoControlPoints(ctx, stroke);
+  }
+
   ctx.restore();
 }
 
+function drawAutoControlPoints(ctx, stroke) {
+  const strokeIndex = state.autoStrokes.indexOf(stroke);
+
+  stroke.points.forEach((point, pointIndex) => {
+    const isSelected =
+      state.autoSelectedPoint?.strokeIndex === strokeIndex &&
+      state.autoSelectedPoint?.pointIndex === pointIndex;
+
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, isSelected ? 17 : 12, 0, Math.PI * 2);
+    ctx.fillStyle = isSelected ? "#ffd84d" : (stroke.color || varToCanvasFallback());
+    ctx.fill();
+    ctx.lineWidth = isSelected ? 6 : 4;
+    ctx.strokeStyle = isSelected ? "rgba(246, 247, 251, 0.95)" : "rgba(12, 12, 13, 0.82)";
+    ctx.stroke();
+  });
+}
+
+function varToCanvasFallback() {
+  return "#19c37d";
+}
+
 function playAutoPath() {
+  if (state.autoRobotPlaying) {
+    stopAutoPath();
+    renderAutoCanvas();
+    return;
+  }
+
   const canPlay = Object.keys(AUTO_ROBOTS).some((robotId) => getAutoPathLength(robotId) > 0);
 
   if (!canPlay) {
@@ -1350,7 +1545,7 @@ function getAutoPathSegments(robotId) {
   const strokes = [...state.autoStrokes, state.autoCurrentStroke].filter(
     (stroke) =>
       stroke &&
-      stroke.tool === "draw" &&
+      stroke.tool !== "erase" &&
       (stroke.robot || "one") === robotId &&
       stroke.points.length > 1,
   );

@@ -387,10 +387,11 @@ main {
 
 .auto-toolbar {
   display: grid;
-  grid-template-columns: minmax(280px, auto) minmax(150px, 200px) minmax(160px, 220px) auto auto;
+  grid-template-columns: minmax(320px, 1fr) minmax(120px, 160px) minmax(130px, 190px) auto auto;
   gap: 12px;
   align-items: center;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(10, 10, 11, 0.34);
   padding: 14px 26px;
 }
 
@@ -402,8 +403,8 @@ main {
 
 .tool-button {
   min-height: 38px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 11px;
   background: rgba(16, 16, 17, 0.78);
   color: var(--ink);
   font: inherit;
@@ -495,24 +496,37 @@ main {
   color: var(--muted);
 }
 
+.auto-path-hint {
+  grid-column: 1 / -1;
+  margin: -4px 0 0;
+  color: rgba(246, 247, 251, 0.66);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
 .auto-stage {
   min-height: 0;
   display: grid;
   place-items: center;
   overflow: auto;
+  background: rgba(5, 5, 6, 0.26);
   padding: 18px;
 }
 
 #auto-canvas {
-  width: min(100%, 760px, calc(100vh - 178px));
+  width: min(100%, 760px, calc(100vh - 214px));
   aspect-ratio: 1;
   height: auto;
   border: 1px solid rgba(25, 195, 125, 0.22);
-  border-radius: 14px;
+  border-radius: 16px;
   background: #101011;
   box-shadow: var(--shadow);
   touch-action: none;
-  cursor: crosshair;
+  cursor: grab;
+}
+
+#auto-canvas:active {
+  cursor: grabbing;
 }
 
 .hero {

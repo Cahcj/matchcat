@@ -161,15 +161,15 @@
           <button class="button button--dark button--small" id="auto-close" type="button">Close</button>
         </div>
       </div>
-      <div class="auto-toolbar" aria-label="ScoutingForm drawing controls">
+      <div class="auto-toolbar" aria-label="ScoutingForm path controls">
         <div class="auto-toolbar__group">
           <button class="tool-button is-active" id="auto-robot-one" type="button">Robot 1</button>
           <button class="tool-button" id="auto-robot-two" type="button">Robot 2</button>
-          <button class="tool-button is-active" id="auto-draw" type="button">Draw</button>
-          <button class="tool-button" id="auto-erase" type="button">Erase</button>
+          <button class="tool-button" id="auto-draw" type="button">+ Add Path</button>
+          <button class="tool-button is-active" id="auto-erase" type="button">+ Control Point</button>
           <button class="tool-button" id="auto-play" type="button">Play</button>
-          <button class="tool-button" id="auto-stop" type="button">Stop</button>
-          <button class="tool-button" id="auto-undo" type="button">Undo</button>
+          <button class="tool-button" id="auto-stop" type="button">- Control Point</button>
+          <button class="tool-button" id="auto-undo" type="button">Undo Point</button>
           <button class="tool-button" id="auto-clear" type="button">Clear</button>
         </div>
         <label>
@@ -177,16 +177,17 @@
           <input id="auto-color" type="color" value="#19c37d">
         </label>
         <label>
-          Size
+          Line
           <input id="auto-size" type="range" min="3" max="28" value="9">
         </label>
         <button class="button button--dark button--small" id="auto-save" type="button">Save Form</button>
         <button class="button button--dark button--small" id="auto-download" type="button">Download</button>
         <p class="auto-save-status" id="auto-save-status">Choose a team to save.</p>
         <p class="auto-cloud-status" id="auto-cloud-status">Cloud sync off.</p>
+        <p class="auto-path-hint">Click the field to add points. Drag a point to move the path.</p>
       </div>
       <div class="auto-stage">
-        <canvas id="auto-canvas" width="1440" height="1440" aria-label="Draw scouting path"></canvas>
+        <canvas id="auto-canvas" width="1440" height="1440" aria-label="Drag path control points"></canvas>
       </div>
     </section>
 
