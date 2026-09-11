@@ -2265,10 +2265,10 @@ function buildPickCandidateWithContext(eventKeyForPick, teamNumber, reports, con
     : percentileScore(winRate, context.winRateValues);
   const reliabilityScore = getPickReliabilityScore({ played, opr, rank, report, insight });
   const pickScore = weightedRatingScore([
-    { value: oprScore, weight: 0.5 },
-    { value: rankScore, weight: 0.22 },
-    { value: autoOprScore, weight: 0.12 },
-    { value: winRateScore, weight: 0.1 },
+    { value: rankScore, weight: 0.38 },
+    { value: winRateScore, weight: 0.28 },
+    { value: oprScore, weight: 0.22 },
+    { value: autoOprScore, weight: 0.06 },
     { value: reliabilityScore, weight: 0.06 },
   ]);
 
@@ -2285,7 +2285,7 @@ function buildPickCandidateWithContext(eventKeyForPick, teamNumber, reports, con
     record: `${wins}-${losses}-${ties}`,
     winRate: Math.round(winRate * 100),
     pickScore,
-    source: "Pick score: OPR + rank + auto + record",
+    source: "Pick score: rank + record + OPR",
   };
 }
 
