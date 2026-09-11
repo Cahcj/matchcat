@@ -75,6 +75,8 @@ const state = {
   autoCurrentStroke: null,
   autoSelectedPoint: null,
   autoDraggingPoint: false,
+  autoDragStartPoint: null,
+  autoDragStartedOnPoint: false,
   autoRobotPlaying: false,
   autoRobotDistances: {
     one: 0,
@@ -165,6 +167,7 @@ const els = {
   autoRobotTwo: document.querySelector("#auto-robot-two"),
   autoDraw: document.querySelector("#auto-draw"),
   autoErase: document.querySelector("#auto-erase"),
+  autoConnect: document.querySelector("#auto-connect"),
   autoPlay: document.querySelector("#auto-play"),
   autoStop: document.querySelector("#auto-stop"),
   autoUndo: document.querySelector("#auto-undo"),
@@ -298,6 +301,7 @@ els.autoRobotOne.addEventListener("click", () => setAutoRobot("one"));
 els.autoRobotTwo.addEventListener("click", () => setAutoRobot("two"));
 els.autoDraw.addEventListener("click", startNewAutoPath);
 els.autoErase.addEventListener("click", () => setAutoTool("point"));
+els.autoConnect.addEventListener("click", createPathToLastPoint);
 els.autoPlay.addEventListener("click", playAutoPath);
 els.autoStop.addEventListener("click", removeSelectedAutoPoint);
 els.autoUndo.addEventListener("click", undoAutoStroke);
@@ -721,15 +725,63 @@ function startNewAutoPath() {
   renderAutoCanvas();
 }
 
+function createPathToLastPoint() {
+  stopAutoPath();
+  const sourcePoint = getSelectedAutoPoint() ?? getLastAutoPointForRobot(state.autoSelectedRobot);
+
+  if (!sourcePoint) {
+    startNewAutoPath();
+    els.autoSaveStatus.textContent = "Click the field to place the first point.";
+    return;
+  }
+
+  const stroke = {
+    tool: "draw",
+    mode: "path",
+    robot: state.autoSelectedRobot,
+    color: els.autoColor.value,
+    size: Number(els.autoSize.value),
+    points: [{ x: sourcePoint.x, y: sourcePoint.y }],
+  };
+  state.autoStrokes.push(stroke);
+  state.autoSelectedPoint = {
+    strokeIndex: state.autoStrokes.length - 1,
+    pointIndex: 0,
+  };
+  setAutoTool("path");
+  els.autoSaveStatus.textContent = "Path started from the selected point. Drag from it to create the next line.";
+  saveAutoDrawing({ silent: true });
+  renderAutoCanvas();
+}
+
+function getSelectedAutoPoint() {
+  if (!state.autoSelectedPoint) return null;
+
+  const point = state.autoStrokes[state.autoSelectedPoint.strokeIndex]?.points?.[state.autoSelectedPoint.pointIndex];
+  return point ? { x: point.x, y: point.y } : null;
+}
+
+function getLastAutoPointForRobot(robotId) {
+  const stroke = [...state.autoStrokes].reverse().find((entry) =>
+    isEditableAutoPath(entry) &&
+    (entry.robot || "one") === robotId &&
+    entry.points.length,
+  );
+  const point = stroke?.points?.[stroke.points.length - 1];
+  return point ? { x: point.x, y: point.y } : null;
+}
+
 function startAutoPointDrag(event) {
   event.preventDefault();
   stopAutoPath();
   const point = getAutoCanvasPoint(event);
   const hitPoint = findAutoPoint(point);
+  state.autoDragStartPoint = point;
+  state.autoDragStartedOnPoint = Boolean(hitPoint);
 
   if (hitPoint) {
     state.autoSelectedPoint = hitPoint;
-    state.autoDraggingPoint = true;
+    state.autoDraggingPoint = false;
   } else {
     addAutoControlPoint(point);
     state.autoDraggingPoint = true;
@@ -740,9 +792,22 @@ function startAutoPointDrag(event) {
 }
 
 function continueAutoPointDrag(event) {
-  if (!state.autoDraggingPoint || !state.autoSelectedPoint) return;
+  if (!state.autoSelectedPoint) return;
 
   event.preventDefault();
+
+  if (!state.autoDraggingPoint && state.autoDragStartedOnPoint) {
+    const nextPoint = getAutoCanvasPoint(event);
+    const distance = Math.hypot(nextPoint.x - state.autoDragStartPoint.x, nextPoint.y - state.autoDragStartPoint.y);
+
+    if (distance < 14) return;
+
+    addAutoControlPoint(nextPoint);
+    state.autoDraggingPoint = true;
+  }
+
+  if (!state.autoDraggingPoint) return;
+
   const stroke = state.autoStrokes[state.autoSelectedPoint.strokeIndex];
   const point = stroke?.points?.[state.autoSelectedPoint.pointIndex];
 
@@ -756,10 +821,15 @@ function continueAutoPointDrag(event) {
 
 function endAutoPointDrag() {
   if (!state.autoDraggingPoint) {
+    state.autoDragStartPoint = null;
+    state.autoDragStartedOnPoint = false;
+    renderAutoCanvas();
     return;
   }
 
   state.autoDraggingPoint = false;
+  state.autoDragStartPoint = null;
+  state.autoDragStartedOnPoint = false;
   saveAutoDrawing({ silent: true });
   renderAutoCanvas();
 }

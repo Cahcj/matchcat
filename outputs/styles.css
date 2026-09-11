@@ -387,25 +387,42 @@ main {
 
 .auto-toolbar {
   display: grid;
-  grid-template-columns: minmax(320px, 1fr) minmax(120px, 160px) minmax(130px, 190px) auto auto;
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  gap: 10px 12px;
   align-items: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(10, 10, 11, 0.34);
-  padding: 14px 26px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 14px;
+  background: rgba(14, 14, 15, 0.62);
+  margin: 10px 14px;
+  padding: 10px;
 }
 
 .auto-toolbar__group {
+  grid-column: 1 / -1;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.auto-toolbar__quick {
+  grid-column: 1 / 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.auto-header-hint {
+  margin: 0 0 0 auto;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 800;
 }
 
 .tool-button {
   min-height: 38px;
   border: 1px solid rgba(255, 255, 255, 0.11);
   border-radius: 11px;
-  background: rgba(16, 16, 17, 0.78);
+  background: rgba(31, 31, 32, 0.92);
   color: var(--ink);
   font: inherit;
   font-size: 0.82rem;
@@ -418,6 +435,22 @@ main {
     color 160ms ease,
     transform 160ms var(--ease),
     box-shadow 160ms ease;
+}
+
+.tool-button--primary {
+  border-color: rgba(35, 136, 217, 0.44);
+  background: rgba(35, 136, 217, 0.18);
+  color: #dceeff;
+}
+
+.tool-button--play {
+  margin-left: auto;
+  border-color: rgba(25, 195, 125, 0.34);
+}
+
+.tool-button--icon {
+  min-width: 54px;
+  padding: 0 10px;
 }
 
 .tool-button:hover,
@@ -460,7 +493,7 @@ main {
 }
 
 .auto-save-status {
-  grid-column: 1 / -1;
+  grid-column: 2 / -1;
   margin: 0;
   color: var(--muted);
   font-size: 0.78rem;
@@ -468,7 +501,7 @@ main {
 }
 
 .auto-cloud-status {
-  grid-column: 1 / -1;
+  grid-column: 2 / -1;
   margin: -4px 0 0;
   border: 1px solid rgba(35, 136, 217, 0.28);
   border-radius: 12px;
@@ -497,7 +530,7 @@ main {
 }
 
 .auto-path-hint {
-  grid-column: 1 / -1;
+  grid-column: 2 / -1;
   margin: -4px 0 0;
   color: rgba(246, 247, 251, 0.66);
   font-size: 0.78rem;
@@ -509,16 +542,19 @@ main {
   display: grid;
   place-items: center;
   overflow: auto;
-  background: rgba(5, 5, 6, 0.26);
-  padding: 18px;
+  background: rgba(11, 11, 12, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  margin: 0 14px 14px;
+  padding: 12px;
 }
 
 #auto-canvas {
-  width: min(100%, 760px, calc(100vh - 214px));
+  width: min(100%, 760px, calc(100vh - 238px));
   aspect-ratio: 1;
   height: auto;
-  border: 1px solid rgba(25, 195, 125, 0.22);
-  border-radius: 16px;
+  border: 1px solid rgba(25, 195, 125, 0.18);
+  border-radius: 12px;
   background: #101011;
   box-shadow: var(--shadow);
   touch-action: none;
@@ -1713,12 +1749,25 @@ tbody tr:hover {
   .auto-toolbar {
     grid-template-columns: 1fr;
     gap: 10px;
-    padding: 12px 16px;
+    margin: 10px;
+    padding: 10px;
   }
 
   .auto-toolbar__group {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .auto-toolbar__quick {
+    grid-column: 1;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .auto-save-status,
+  .auto-cloud-status,
+  .auto-path-hint {
+    grid-column: 1;
   }
 
   .tool-button {
@@ -1726,6 +1775,7 @@ tbody tr:hover {
   }
 
   .auto-stage {
+    margin: 0 10px 10px;
     padding: 12px;
   }
 

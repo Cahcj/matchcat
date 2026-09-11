@@ -150,9 +150,10 @@
       <div class="auto-menu__header">
         <div>
           <p class="section-kicker">ScoutingForm</p>
-          <h2 id="auto-title">ScoutingForm</h2>
+          <h2 id="auto-title">Field</h2>
           <small id="auto-current-team">No team selected</small>
         </div>
+        <p class="auto-header-hint">Click a line or point to select it</p>
         <div class="auto-menu__photo" id="auto-menu-photo" hidden>
           <img id="auto-menu-photo-img" alt="Saved robot picture">
         </div>
@@ -163,13 +164,16 @@
       </div>
       <div class="auto-toolbar" aria-label="ScoutingForm path controls">
         <div class="auto-toolbar__group">
-          <button class="tool-button is-active" id="auto-robot-one" type="button">Robot 1</button>
-          <button class="tool-button" id="auto-robot-two" type="button">Robot 2</button>
           <button class="tool-button" id="auto-draw" type="button">+ Add Path</button>
           <button class="tool-button is-active" id="auto-erase" type="button">+ Control Point</button>
-          <button class="tool-button" id="auto-play" type="button">Play</button>
           <button class="tool-button" id="auto-stop" type="button">- Control Point</button>
-          <button class="tool-button" id="auto-undo" type="button">Undo Point</button>
+          <button class="tool-button tool-button--primary" id="auto-connect" type="button">Create Path to Last Point</button>
+        </div>
+        <div class="auto-toolbar__quick">
+          <button class="tool-button tool-button--icon is-active" id="auto-robot-one" type="button" title="Robot 1">R1</button>
+          <button class="tool-button tool-button--icon" id="auto-robot-two" type="button" title="Robot 2">R2</button>
+          <button class="tool-button tool-button--icon" id="auto-undo" type="button" title="Undo last point">Undo</button>
+          <button class="tool-button tool-button--play" id="auto-play" type="button">Play</button>
           <button class="tool-button" id="auto-clear" type="button">Clear</button>
         </div>
         <label>
@@ -184,7 +188,7 @@
         <button class="button button--dark button--small" id="auto-download" type="button">Download</button>
         <p class="auto-save-status" id="auto-save-status">Choose a team to save.</p>
         <p class="auto-cloud-status" id="auto-cloud-status">Cloud sync off.</p>
-        <p class="auto-path-hint">Click the field to add points. Drag a point to move the path.</p>
+        <p class="auto-path-hint">Click to place points. Drag from a point to create a straight line.</p>
       </div>
       <div class="auto-stage">
         <canvas id="auto-canvas" width="1440" height="1440" aria-label="Drag path control points"></canvas>
