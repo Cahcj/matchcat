@@ -11,7 +11,6 @@ const OFFLINE_REFRESH_DELAY = 900;
 const AUTO_ROBOT_SIZE = 192;
 const AUTO_ROBOT_HEIGHT = 192;
 const AUTO_ROBOT_SPEED = 430;
-const AUTO_MIN_LINE_DRAG_DISTANCE = 14;
 const AUTO_FIELD_ROTATION = Math.PI / 2;
 const AUTO_STARTER_LINE_LENGTH = 260;
 const AUTO_ROBOTS = {
@@ -77,8 +76,6 @@ const state = {
   autoSelectedPoint: null,
   autoDraggingPoint: false,
   autoDraggingStartRobot: null,
-  autoDragStartPoint: null,
-  autoDragStartedOnPoint: false,
   autoRobotStarts: getDefaultAutoRobotStarts(),
   autoRobotPlaying: false,
   autoRobotDistances: {
@@ -166,8 +163,6 @@ const els = {
   autoMenuPhoto: document.querySelector("#auto-menu-photo"),
   autoMenuPhotoImg: document.querySelector("#auto-menu-photo-img"),
   autoCanvas: document.querySelector("#auto-canvas"),
-  autoRobotOne: document.querySelector("#auto-robot-one"),
-  autoDraw: document.querySelector("#auto-draw"),
   autoErase: document.querySelector("#auto-erase"),
   autoConnect: document.querySelector("#auto-connect"),
   autoPlay: document.querySelector("#auto-play"),
@@ -299,9 +294,7 @@ els.autoTeamTest.addEventListener("click", () => {
 });
 els.autoPhotoInput.addEventListener("change", handleAutoPhotoInput);
 els.autoPhotoClear.addEventListener("click", clearAutoPhoto);
-els.autoRobotOne.addEventListener("click", () => setAutoRobot("one"));
-els.autoDraw.addEventListener("click", startNewAutoPath);
-els.autoErase.addEventListener("click", () => setAutoTool("point"));
+els.autoErase.addEventListener("click", addNextAutoControlPoint);
 els.autoConnect.addEventListener("click", createPathToLastPoint);
 els.autoPlay.addEventListener("click", playAutoPath);
 els.autoStop.addEventListener("click", removeSelectedAutoPoint);
@@ -692,7 +685,6 @@ function updateAutoHeader() {
 
 function setAutoTool(tool) {
   state.autoTool = tool;
-  els.autoDraw.classList.toggle("is-active", tool === "path");
   els.autoErase.classList.toggle("is-active", tool === "point");
 }
 
@@ -700,7 +692,6 @@ function setAutoRobot(robotId) {
   const nextRobotId = AUTO_ROBOTS[robotId] ? robotId : "one";
   state.autoSelectedRobot = nextRobotId;
   state.autoSelectedPoint = null;
-  els.autoRobotOne.classList.toggle("is-active", nextRobotId === "one");
   els.autoColor.value = AUTO_ROBOTS[nextRobotId].color;
   renderAutoCanvas();
 }
@@ -783,24 +774,20 @@ function startAutoPointDrag(event) {
     state.autoDraggingStartRobot = hitRobotStart;
     state.autoSelectedPoint = null;
     state.autoDraggingPoint = false;
-    state.autoDragStartPoint = point;
-    state.autoDragStartedOnPoint = false;
-    setAutoRobot(hitRobotStart);
+    els.autoColor.value = AUTO_ROBOTS[hitRobotStart].color;
     els.autoCanvas.setPointerCapture(event.pointerId);
     renderAutoCanvas();
     return;
   }
 
   const hitPoint = findAutoPoint(point);
-  state.autoDragStartPoint = point;
-  state.autoDragStartedOnPoint = Boolean(hitPoint);
 
   if (hitPoint) {
     state.autoSelectedPoint = hitPoint;
-    state.autoDraggingPoint = false;
-  } else {
-    addAutoControlPoint(point);
     state.autoDraggingPoint = true;
+  } else {
+    state.autoSelectedPoint = null;
+    state.autoDraggingPoint = false;
   }
 
   els.autoCanvas.setPointerCapture(event.pointerId);
@@ -821,16 +808,6 @@ function continueAutoPointDrag(event) {
 
   event.preventDefault();
 
-  if (!state.autoDraggingPoint && state.autoDragStartedOnPoint) {
-    const nextPoint = getAutoCanvasPoint(event);
-    const distance = Math.hypot(nextPoint.x - state.autoDragStartPoint.x, nextPoint.y - state.autoDragStartPoint.y);
-
-    if (distance < AUTO_MIN_LINE_DRAG_DISTANCE) return;
-
-    addAutoControlPoint(nextPoint);
-    state.autoDraggingPoint = true;
-  }
-
   if (!state.autoDraggingPoint) return;
 
   const stroke = state.autoStrokes[state.autoSelectedPoint.strokeIndex];
@@ -847,23 +824,17 @@ function continueAutoPointDrag(event) {
 function endAutoPointDrag() {
   if (state.autoDraggingStartRobot) {
     state.autoDraggingStartRobot = null;
-    state.autoDragStartPoint = null;
-    state.autoDragStartedOnPoint = false;
     saveAutoDrawing({ silent: true });
     renderAutoCanvas();
     return;
   }
 
   if (!state.autoDraggingPoint) {
-    state.autoDragStartPoint = null;
-    state.autoDragStartedOnPoint = false;
     renderAutoCanvas();
     return;
   }
 
   state.autoDraggingPoint = false;
-  state.autoDragStartPoint = null;
-  state.autoDragStartedOnPoint = false;
   saveAutoDrawing({ silent: true });
   renderAutoCanvas();
 }
@@ -906,6 +877,46 @@ function clearAutoCanvas() {
   resetAutoRobotDistances();
   saveAutoDrawing({ silent: true });
   renderAutoCanvas();
+}
+
+function addNextAutoControlPoint() {
+  stopAutoPath();
+  const stroke = getActiveAutoPath(true);
+  const basePoint = getSelectedAutoPoint() ||
+    (stroke?.points?.length ? stroke.points[stroke.points.length - 1] : null) ||
+    state.autoRobotStarts[state.autoSelectedRobot] ||
+    AUTO_ROBOTS[state.autoSelectedRobot].start;
+  const point = getNextAutoPointPosition(basePoint);
+
+  addAutoControlPoint(point);
+  state.autoDraggingPoint = false;
+  els.autoSaveStatus.textContent = "Control point added. Drag the point to move the line.";
+  resetAutoRobotDistances();
+  saveAutoDrawing({ silent: true });
+  renderAutoCanvas();
+}
+
+function getNextAutoPointPosition(basePoint) {
+  const canvas = els.autoCanvas;
+  const offset = AUTO_STARTER_LINE_LENGTH * 0.75;
+  const margin = AUTO_ROBOT_HEIGHT / 2;
+  const canMoveUp = basePoint.y - offset >= margin;
+  const canMoveRight = basePoint.x + offset <= canvas.width - margin;
+  const canMoveLeft = basePoint.x - offset >= margin;
+
+  if (canMoveUp) {
+    return { x: basePoint.x, y: basePoint.y - offset };
+  }
+
+  if (canMoveRight) {
+    return { x: basePoint.x + offset, y: basePoint.y };
+  }
+
+  if (canMoveLeft) {
+    return { x: basePoint.x - offset, y: basePoint.y };
+  }
+
+  return { x: basePoint.x, y: Math.min(canvas.height - margin, basePoint.y + offset) };
 }
 
 function addAutoControlPoint(point) {
