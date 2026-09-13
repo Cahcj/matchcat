@@ -1715,6 +1715,25 @@ tbody tr:hover {
     display: block;
   }
 
+  .auto-team-menu {
+    align-items: start;
+    justify-items: center;
+    min-height: 100dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 72px 12px max(18px, env(safe-area-inset-bottom));
+    pointer-events: auto;
+  }
+
+  .auto-team-card {
+    width: min(100%, 440px);
+    max-height: calc(100dvh - 90px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    padding: 18px;
+  }
+
   .sidebar-backdrop {
     position: fixed;
     inset: 0;
