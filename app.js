@@ -13,7 +13,7 @@ const AUTO_ROBOT_HEIGHT = 192;
 const AUTO_ROBOT_SPEED = 430;
 const AUTO_FIELD_ROTATION = 0;
 const AUTO_STARTER_LINE_LENGTH = 260;
-const AUTO_SHOOT_PAUSE_MS = 2000;
+const AUTO_SHOOT_PAUSE_MS = 1000;
 const AUTO_ROBOTS = {
   one: {
     label: "7305",
@@ -912,7 +912,7 @@ function toggleSelectedAutoShoot() {
   point.shoot = !point.shoot;
   els.autoShoot.classList.toggle("is-active", Boolean(point.shoot));
   els.autoSaveStatus.textContent = point.shoot
-    ? "Shoot added. Playback will pause here for 2 seconds."
+    ? "Shoot added. Playback will pause here for 1 second."
     : "Shoot removed from this control point.";
   saveAutoDrawing({ silent: true });
   renderAutoCanvas();
@@ -1862,7 +1862,7 @@ function stepAutoRobot(timestamp) {
       state.autoRobotDistances[robotId] = shootEvent.distance;
       state.autoShootPauseUntil = timestamp + AUTO_SHOOT_PAUSE_MS;
       state.autoPausedShootPoints.add(shootEvent.key);
-      els.autoSaveStatus.textContent = "Shoot point reached. Pausing for 2 seconds.";
+      els.autoSaveStatus.textContent = "Shoot point reached. Pausing for 1 second.";
       pausedAtShoot = true;
       return;
     }
