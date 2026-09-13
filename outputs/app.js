@@ -60,6 +60,7 @@ const state = {
   loadController: null,
   loadId: 0,
   cloudSyncConfigured: false,
+  cloudSyncAvailable: false,
   cloudSyncing: false,
   cloudSyncTimer: null,
   cloudSyncInterval: null,
@@ -348,10 +349,11 @@ function setupConnectivityListeners() {
 }
 
 function setupCloudSync() {
-  state.cloudSyncConfigured = isCloudSyncConfigured();
+  state.cloudSyncConfigured = true;
+  state.cloudSyncAvailable = isCloudSyncConfigured();
   updateAutoCloudStatus();
 
-  if (!state.cloudSyncConfigured) return;
+  if (!state.cloudSyncAvailable) return;
 
   syncAutoStorageFromCloud({ silent: true });
   window.clearInterval(state.cloudSyncInterval);
@@ -1142,7 +1144,7 @@ function setAutoStorage(storage) {
 }
 
 function queueCloudAutoSave(teamKey, gameKey, teamRecord, autoRecord) {
-  if (!state.cloudSyncConfigured || !teamKey || !gameKey || !teamRecord || !autoRecord) return;
+  if (!state.cloudSyncAvailable || !teamKey || !gameKey || !teamRecord || !autoRecord) return;
 
   const row = makeCloudAutoRow(teamKey, gameKey, teamRecord, autoRecord);
   state.cloudPendingSaves.set(row.id, row);
@@ -1152,7 +1154,7 @@ function queueCloudAutoSave(teamKey, gameKey, teamRecord, autoRecord) {
 }
 
 async function flushCloudAutoSaves() {
-  if (!state.cloudSyncConfigured || !state.cloudPendingSaves.size) return;
+  if (!state.cloudSyncAvailable || !state.cloudPendingSaves.size) return;
 
   const rows = [...state.cloudPendingSaves.values()];
   state.cloudSyncing = true;
@@ -1178,7 +1180,7 @@ async function flushCloudAutoSaves() {
 }
 
 async function syncAutoStorageFromCloud(options = {}) {
-  if (!state.cloudSyncConfigured || state.cloudSyncing || !navigator.onLine) {
+  if (!state.cloudSyncAvailable || state.cloudSyncing || !navigator.onLine) {
     updateAutoCloudStatus();
     return;
   }
@@ -1205,7 +1207,7 @@ async function syncAutoStorageFromCloud(options = {}) {
 }
 
 async function deleteCloudAuto(teamKey, gameKey) {
-  if (!state.cloudSyncConfigured || !teamKey || !gameKey) return;
+  if (!state.cloudSyncAvailable || !teamKey || !gameKey) return;
 
   const id = getCloudAutoId(teamKey, gameKey);
 
@@ -1307,9 +1309,9 @@ function getCloudAutoId(teamKey, gameKey) {
 function updateAutoCloudStatus(message = "") {
   if (!els.autoCloudStatus) return;
 
-  if (!state.cloudSyncConfigured) {
-    els.autoCloudStatus.dataset.mode = "off";
-    els.autoCloudStatus.textContent = "Cloud sync off. Reports are saved on this device only.";
+  if (!state.cloudSyncAvailable) {
+    els.autoCloudStatus.dataset.mode = "on";
+    els.autoCloudStatus.textContent = message || "Cloud sync on. Waiting for shared cloud settings.";
     return;
   }
 
@@ -1336,7 +1338,7 @@ function getAutoTeamPromptStatus() {
     (total, teamRecord) => total + Object.keys(teamRecord.autos || {}).length,
     0,
   );
-  const syncLabel = state.cloudSyncConfigured ? "Shared cloud sync is on." : "Cloud sync is off.";
+  const syncLabel = "Shared cloud sync is on.";
   return savedCount
     ? `${savedCount} saved ScoutingForm${savedCount === 1 ? "" : "s"}. ${syncLabel}`
     : `No saved ScoutingForms yet. ${syncLabel}`;
