@@ -35,12 +35,12 @@ const GAME_SEASONS = {
   2024: "2023-2024 CENTERSTAGE",
   2025: "2024-2025 INTO THE DEEP",
   2026: "2025-2026 DECODE",
-  2027: "2026-2027 Game TBA",
+  2027: "2026-2027 BIOBUZZ",
 };
 
 const state = {
   team: TEAM_NUMBER,
-  year: 2026,
+  year: 2027,
   teamInfo: null,
   participation: [],
   details: new Map(),
