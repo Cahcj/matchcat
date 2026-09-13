@@ -13,8 +13,6 @@ const AUTO_ROBOT_HEIGHT = 192;
 const AUTO_ROBOT_SPEED = 430;
 const AUTO_FIELD_ROTATION = 0;
 const AUTO_STARTER_LINE_LENGTH = 260;
-const AUTO_SHOOT_DURATION = 1150;
-const AUTO_SHOOT_TARGET = { x: 65, y: 370 };
 const AUTO_ROBOTS = {
   one: {
     label: "7305",
@@ -86,8 +84,6 @@ const state = {
   },
   autoRobotFrame: null,
   autoRobotLastTime: 0,
-  autoShooting: null,
-  autoShotPoints: new Set(),
   autoTeamKey: "",
   autoTeamLabel: "",
   autoGameKey: "",
@@ -913,7 +909,7 @@ function toggleSelectedAutoShoot() {
   point.shoot = !point.shoot;
   els.autoShoot.classList.toggle("is-active", Boolean(point.shoot));
   els.autoSaveStatus.textContent = point.shoot
-    ? "Shoot added. Playback will pause here and shoot into the red hoop."
+    ? "Shoot added. Playback will pause here."
     : "Shoot removed from this control point.";
   saveAutoDrawing({ silent: true });
   renderAutoCanvas();
@@ -1649,7 +1645,6 @@ function renderAutoCanvas() {
   Object.keys(AUTO_ROBOTS).forEach((robotId) => {
     drawAutoRobot(ctx, robotId);
   });
-  drawAutoShotAnimation(ctx);
   syncAutoShootButton();
 }
 
@@ -1805,8 +1800,6 @@ function playAutoPath() {
   stopAutoPath();
   state.autoRobotPlaying = true;
   resetAutoRobotDistances();
-  state.autoShooting = null;
-  state.autoShotPoints = new Set();
   state.autoRobotLastTime = 0;
   els.autoPlay.classList.add("is-active");
   state.autoRobotFrame = requestAnimationFrame(stepAutoRobot);
@@ -1820,7 +1813,6 @@ function stopAutoPath() {
   state.autoRobotPlaying = false;
   state.autoRobotFrame = null;
   state.autoRobotLastTime = 0;
-  state.autoShooting = null;
   els.autoPlay.classList.remove("is-active");
 }
 
@@ -1829,26 +1821,16 @@ function stepAutoRobot(timestamp) {
     return;
   }
 
-  if (state.autoShooting) {
-    const elapsed = timestamp - state.autoShooting.startedAt;
-    if (elapsed >= state.autoShooting.duration) {
-      state.autoShooting = null;
-      state.autoRobotLastTime = timestamp;
-    } else {
-      renderAutoCanvas();
-      state.autoRobotFrame = requestAnimationFrame(stepAutoRobot);
-      return;
-    }
-  }
-
   if (!state.autoRobotLastTime) {
     state.autoRobotLastTime = timestamp;
   }
 
   const elapsedSeconds = (timestamp - state.autoRobotLastTime) / 1000;
   state.autoRobotLastTime = timestamp;
+  let pausedAtShoot = false;
 
   Object.keys(AUTO_ROBOTS).forEach((robotId) => {
+    if (pausedAtShoot) return;
     const pathLength = getAutoPathLength(robotId);
     if (pathLength <= 0) return;
     const previousDistance = state.autoRobotDistances[robotId];
@@ -1860,15 +1842,12 @@ function stepAutoRobot(timestamp) {
 
     if (shootEvent) {
       state.autoRobotDistances[robotId] = shootEvent.distance;
-      state.autoShooting = {
-        robotId,
-        point: shootEvent.point,
-        target: AUTO_SHOOT_TARGET,
-        startedAt: timestamp,
-        duration: AUTO_SHOOT_DURATION,
-        ballCount: 3,
-      };
-      state.autoShotPoints.add(shootEvent.key);
+      state.autoRobotPlaying = false;
+      state.autoRobotFrame = null;
+      state.autoRobotLastTime = 0;
+      els.autoPlay.classList.remove("is-active");
+      els.autoSaveStatus.textContent = "Shoot point reached.";
+      pausedAtShoot = true;
       return;
     }
 
@@ -1877,6 +1856,11 @@ function stepAutoRobot(timestamp) {
       pathLength,
     );
   });
+
+  if (pausedAtShoot) {
+    renderAutoCanvas();
+    return;
+  }
 
   const allRobotsDone = Object.keys(AUTO_ROBOTS).every((robotId) => {
     const pathLength = getAutoPathLength(robotId);
@@ -1900,7 +1884,6 @@ function resetAutoRobotDistances() {
   Object.keys(AUTO_ROBOTS).forEach((robotId) => {
     state.autoRobotDistances[robotId] = 0;
   });
-  state.autoShooting = null;
 }
 
 function getAutoPathSegments(robotId) {
@@ -1948,7 +1931,6 @@ function getAutoShootEvent(robotId, previousDistance, nextDistance) {
 
     if (
       segment.point?.shoot &&
-      !state.autoShotPoints.has(key) &&
       previousDistance < distance &&
       nextDistance >= distance
     ) {
@@ -2001,45 +1983,6 @@ function getAutoRobotPose(robotId) {
     y: lastSegment.to.y,
     angle: -Math.PI / 2,
   };
-}
-
-function drawAutoShotAnimation(ctx) {
-  if (!state.autoShooting) return;
-
-  const elapsed = performance.now() - state.autoShooting.startedAt;
-  const progress = Math.max(0, Math.min(1, elapsed / state.autoShooting.duration));
-  const source = state.autoShooting.point;
-  const target = state.autoShooting.target;
-
-  for (let index = 0; index < state.autoShooting.ballCount; index += 1) {
-    const delay = index * 0.16;
-    const ballProgress = Math.max(0, Math.min(1, (progress - delay) / (1 - delay)));
-    const arc = Math.sin(ballProgress * Math.PI) * 95;
-    const x = source.x + (target.x - source.x) * ballProgress;
-    const y = source.y + (target.y - source.y) * ballProgress - arc;
-
-    ctx.save();
-    ctx.shadowColor = "rgba(255, 216, 77, 0.72)";
-    ctx.shadowBlur = 16;
-    ctx.fillStyle = "#ffd84d";
-    ctx.strokeStyle = "rgba(33, 28, 0, 0.72)";
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.arc(x, y, 15, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  ctx.save();
-  ctx.strokeStyle = "rgba(255, 216, 77, 0.42)";
-  ctx.lineWidth = 5;
-  ctx.setLineDash([12, 12]);
-  ctx.beginPath();
-  ctx.moveTo(source.x, source.y);
-  ctx.lineTo(target.x, target.y);
-  ctx.stroke();
-  ctx.restore();
 }
 
 function drawAutoRobot(ctx, robotId) {
