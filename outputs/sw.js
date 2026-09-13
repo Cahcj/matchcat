@@ -1,4 +1,4 @@
-const APP_CACHE = "matchcat-app-v23";
+const APP_CACHE = "matchcat-app-v24";
 const RUNTIME_CACHE = "matchcat-api-cache-v1";
 const APP_SHELL = [
   "./",

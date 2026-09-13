@@ -881,45 +881,33 @@ select {
 }
 
 .team-search-panel {
-  display: grid;
-  gap: 16px;
-  margin: 0 auto 20px;
-  padding: 20px;
-}
-
-.team-search-panel__header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(260px, 420px);
-  gap: 16px;
-  align-items: end;
-}
-
-.team-search-panel h2 {
-  margin: 4px 0 0;
-  font-size: clamp(1.35rem, 2vw, 2rem);
-}
-
-.team-search-box {
+  position: absolute;
+  top: 18px;
+  right: max(18px, calc((100vw - 1440px) / 2 + 18px));
+  z-index: 3;
+  width: min(250px, calc(100% - 36px));
+  max-height: min(520px, calc(100% - 36px));
   display: grid;
   gap: 8px;
-  color: var(--muted);
-  font-size: 0.78rem;
-  font-weight: 850;
+  overflow: visible;
+  border-radius: 14px;
+  padding: 8px;
 }
 
-.team-search-box input {
+.team-search-panel > input {
   width: 100%;
-  min-height: 46px;
+  min-height: 36px;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 10px;
   background: rgba(10, 10, 11, 0.72);
   color: var(--ink);
   font: inherit;
+  font-size: 0.82rem;
   font-weight: 850;
-  padding: 0 14px;
+  padding: 0 11px;
 }
 
-.team-search-box input:focus {
+.team-search-panel > input:focus {
   border-color: rgba(25, 195, 125, 0.52);
   box-shadow: 0 0 0 4px rgba(25, 195, 125, 0.1);
   outline: none;
@@ -927,18 +915,21 @@ select {
 
 .team-search-results {
   display: grid;
-  gap: 10px;
+  gap: 8px;
+  max-height: 360px;
+  overflow-y: auto;
+  padding-right: 2px;
 }
 
 .team-search-card {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(112px, auto) auto;
-  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 9px 12px;
   align-items: center;
   border: 1px solid rgba(255, 255, 255, 0.075);
   border-radius: 14px;
   background: rgba(8, 8, 9, 0.46);
-  padding: 14px;
+  padding: 11px;
 }
 
 .team-search-card__main {
@@ -955,7 +946,7 @@ select {
 
 .team-search-card__main strong {
   color: var(--ink);
-  font-size: 1.05rem;
+  font-size: 0.96rem;
   line-height: 1.15;
 }
 
@@ -972,6 +963,10 @@ select {
   font-size: 0.82rem;
   font-weight: 750;
   line-height: 1.35;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .team-search-card__empty-note {
@@ -985,6 +980,8 @@ select {
 }
 
 .team-search-card .team-link {
+  grid-column: 1 / -1;
+  justify-content: center;
   width: auto;
   max-width: none;
   min-height: 36px;
@@ -2168,12 +2165,13 @@ tbody tr:hover {
   }
 
   .team-search-panel {
-    gap: 12px;
-    border-radius: 14px;
-    padding: 14px;
+    top: 10px;
+    right: 10px;
+    width: min(210px, calc(100% - 70px));
+    border-radius: 12px;
+    padding: 6px;
   }
 
-  .team-search-panel__header,
   .team-search-card {
     grid-template-columns: 1fr;
   }

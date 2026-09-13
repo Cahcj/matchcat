@@ -3040,7 +3040,7 @@ function renderTeamSearch() {
   const query = (state.teamSearchQuery || "").trim().toLowerCase();
 
   if (!query) {
-    els.teamSearchResults.innerHTML = `<div class="empty">Type a team number, team name, or scouting note to search.</div>`;
+    els.teamSearchResults.innerHTML = "";
     return;
   }
 
