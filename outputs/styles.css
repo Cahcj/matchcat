@@ -1750,11 +1750,18 @@ tbody tr:hover {
   .ranking-menu,
   .sim-menu,
   .auto-menu {
-    top: 66px;
-    right: 10px;
-    bottom: 10px;
-    left: 10px;
+    top: 58px;
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
     border-radius: 18px;
+  }
+
+  .auto-menu {
+    grid-template-rows: auto auto minmax(340px, 1fr);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
   }
 
   .picks-menu__header,
@@ -1762,7 +1769,21 @@ tbody tr:hover {
   .sim-menu__header,
   .auto-menu__header {
     flex-wrap: wrap;
-    padding: 16px;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .auto-menu__header h2 {
+    font-size: 1.18rem;
+  }
+
+  .auto-menu__header small {
+    margin-top: 3px;
+    font-size: 0.68rem;
+  }
+
+  .auto-header-hint {
+    display: none;
   }
 
   .auto-menu__photo {
@@ -1775,9 +1796,9 @@ tbody tr:hover {
 
   .auto-toolbar {
     grid-template-columns: 1fr;
-    gap: 7px;
-    margin: 8px;
-    padding: 8px;
+    gap: 6px;
+    margin: 6px;
+    padding: 6px;
   }
 
   .auto-toolbar__group {
@@ -1798,17 +1819,30 @@ tbody tr:hover {
   }
 
   .tool-button {
-    min-height: 31px;
+    min-height: 34px;
     padding: 0 7px;
+    font-size: 0.68rem;
+  }
+
+  .auto-toolbar label {
+    font-size: 0.66rem;
+  }
+
+  .auto-toolbar input[type="color"] {
+    width: 38px;
+    height: 30px;
   }
 
   .auto-stage {
-    margin: 0 8px 8px;
+    align-items: start;
+    min-height: 340px;
+    margin: 0 6px 6px;
     padding: 8px;
   }
 
   #auto-canvas {
-    width: min(100%, calc(100vh - 244px));
+    width: min(100%, 560px);
+    max-width: calc(100vw - 32px);
   }
 
   .picks-menu__controls,
@@ -1889,6 +1923,74 @@ tbody tr:hover {
 }
 
 @media (max-width: 560px) {
+  .auto-menu {
+    top: 6px;
+    right: 4px;
+    bottom: 4px;
+    left: 4px;
+    border-radius: 12px;
+    grid-template-rows: auto auto minmax(300px, 1fr);
+  }
+
+  .auto-menu__header {
+    padding: 9px 10px;
+  }
+
+  .auto-menu__actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .auto-menu__actions .button {
+    min-height: 36px;
+    padding: 0 8px;
+  }
+
+  .auto-menu__photo img {
+    width: 48px;
+  }
+
+  .auto-toolbar {
+    margin: 4px;
+    padding: 5px;
+  }
+
+  .auto-toolbar__group,
+  .auto-toolbar__quick {
+    gap: 5px;
+  }
+
+  .auto-toolbar__group {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .auto-toolbar__quick {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .auto-save-status,
+  .auto-cloud-status,
+  .auto-path-hint {
+    font-size: 0.66rem;
+    line-height: 1.25;
+  }
+
+  .auto-cloud-status {
+    padding: 6px 8px;
+  }
+
+  .auto-stage {
+    min-height: 310px;
+    margin: 0 4px 4px;
+    padding: 6px;
+  }
+
+  #auto-canvas {
+    max-width: calc(100vw - 22px);
+    border-radius: 9px;
+  }
+
   .hero {
     min-height: auto;
   }
