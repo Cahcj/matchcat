@@ -96,6 +96,7 @@ const state = {
   autoMotorRpm: "312rpm",
   autoRobotPhoto: "",
   autoNotes: "",
+  teamSearchQuery: "",
   selectedTeam: null,
 };
 
@@ -186,6 +187,8 @@ const els = {
   teamDetailTitle: document.querySelector("#team-detail-title"),
   teamDetailBody: document.querySelector("#team-detail-body"),
   teamDetailClose: document.querySelector("#team-detail-close"),
+  teamSearchInput: document.querySelector("#team-search-input"),
+  teamSearchResults: document.querySelector("#team-search-results"),
 };
 
 els.form.addEventListener("submit", (event) => {
@@ -243,6 +246,11 @@ els.simPartnerFilter.addEventListener("change", () => {
 els.teamDetailClose.addEventListener("click", () => {
   state.selectedTeam = null;
   renderTeamDetail();
+});
+
+els.teamSearchInput.addEventListener("input", () => {
+  state.teamSearchQuery = els.teamSearchInput.value.trim();
+  renderTeamSearch();
 });
 
 els.sidebarToggle.addEventListener("click", () => {
@@ -1198,6 +1206,7 @@ async function syncAutoStorageFromCloud(options = {}) {
       ? `Synced ${mergedCount} shared ScoutingForm${mergedCount === 1 ? "" : "s"}.`
       : "Cloud sync ready. No shared forms yet.");
     renderTeamDetail();
+    renderTeamSearch();
   } catch (error) {
     console.warn("Could not load shared ScoutingForms.", error);
     updateAutoCloudStatus("Cloud sync is having trouble. Local saves still work.");
@@ -1540,6 +1549,7 @@ function saveAutoDrawing(options = {}) {
   if (!options.silent) {
     els.autoSaveStatus.textContent = `Saved ${storage[state.autoTeamKey].autos[gameKey].gameLabel} ScoutingForm for ${state.autoTeamLabel}.`;
   }
+  renderTeamSearch();
 }
 
 function getAutosForTeam(teamNumber, teamName) {
@@ -1626,6 +1636,7 @@ function deleteSavedAuto(teamKey, gameKey) {
   }
 
   renderTeamDetail();
+  renderTeamSearch();
 }
 
 function getAutoCanvasPoint(event) {
@@ -2426,6 +2437,7 @@ function render() {
   renderPicks();
   renderRanking();
   renderAllianceSimulator();
+  renderTeamSearch();
   renderMatches(pastRows);
 }
 
@@ -3020,6 +3032,164 @@ function renderAllianceSimulator() {
     </article>
     ${threatRows}
   `;
+}
+
+function renderTeamSearch() {
+  if (!els.teamSearchResults) return;
+
+  const query = (state.teamSearchQuery || "").trim().toLowerCase();
+
+  if (!query) {
+    els.teamSearchResults.innerHTML = `<div class="empty">Type a team number, team name, or scouting note to search.</div>`;
+    return;
+  }
+
+  const matches = getTeamSearchRows(query).slice(0, 12);
+
+  if (!matches.length) {
+    els.teamSearchResults.innerHTML = `<div class="empty">No teams found for "${escapeHtml(state.teamSearchQuery)}".</div>`;
+    return;
+  }
+
+  els.teamSearchResults.innerHTML = matches.map((team) => `
+    <article class="team-search-card">
+      <div class="team-search-card__main">
+        <span>#${team.teamNumber}</span>
+        <strong>${escapeHtml(team.name)}</strong>
+        <small>${escapeHtml(team.eventLabel)} / ${team.record} / Season ${team.seasonRecord}</small>
+        ${team.notes.length
+          ? `<p>${escapeHtml(team.notes[0].notes)}</p>`
+          : `<p class="team-search-card__empty-note">No saved scouting notes yet.</p>`}
+      </div>
+      <div class="team-search-card__rating">
+        <span class="stars" aria-label="${team.stars} out of 5 stars">${starRating(team.stars) || "0 stars"}</span>
+        <small>${team.notes.length} note${team.notes.length === 1 ? "" : "s"}</small>
+      </div>
+      <button class="button button--small team-link" type="button" data-team-number="${team.teamNumber}" data-event-key="${escapeHtml(team.eventKey)}">View Team</button>
+    </article>
+  `).join("");
+}
+
+function getTeamSearchRows(query) {
+  return [...collectSearchTeamNumbers()]
+    .map((teamNumber) => buildTeamSearchRow(teamNumber))
+    .filter(Boolean)
+    .filter((team) => team.searchText.includes(query))
+    .sort((a, b) =>
+      Number(b.numberStartsWithQuery) - Number(a.numberStartsWithQuery) ||
+      Number(b.nameIncludesQuery) - Number(a.nameIncludesQuery) ||
+      b.notes.length - a.notes.length ||
+      b.score - a.score ||
+      a.teamNumber - b.teamNumber,
+    );
+}
+
+function collectSearchTeamNumbers() {
+  const teams = new Set();
+
+  state.teamNames.forEach((_, teamNumber) => {
+    if (Number.isFinite(Number(teamNumber))) teams.add(Number(teamNumber));
+  });
+
+  state.teamEventStats.forEach((record) => {
+    if (Number.isFinite(record.teamNumber)) teams.add(Number(record.teamNumber));
+  });
+
+  state.eventTeamInsights.forEach((_, key) => {
+    const { teamNumber } = parseTeamStatsKey(key);
+    if (Number.isFinite(teamNumber)) teams.add(teamNumber);
+  });
+
+  Object.values(getAutoStorage()).forEach((teamRecord) => {
+    const parsedNumber = getTeamNumberFromAutoRecord(teamRecord);
+    if (Number.isFinite(parsedNumber)) teams.add(parsedNumber);
+  });
+
+  return teams;
+}
+
+function buildTeamSearchRow(teamNumber) {
+  if (!Number.isFinite(teamNumber)) return null;
+
+  const query = state.teamSearchQuery.trim().toLowerCase();
+  const name = state.teamNames.get(teamNumber) ?? getAutoStorageLabelForTeam(teamNumber) ?? `Team ${teamNumber}`;
+  const history = getTeamEventHistory(teamNumber);
+  const latest = history[0];
+  const seasonRecord = getTeamSeasonRecord(teamNumber);
+  const notes = getAutosForTeam(teamNumber, name)
+    .filter((autoRecord) => autoRecord.notes)
+    .map((autoRecord) => ({
+      notes: autoRecord.notes,
+      gameLabel: autoRecord.gameLabel || getAutoGameLabel(autoRecord.gameKey),
+      addedDate: autoRecord.addedDate || "",
+    }));
+  const eventKeyForCard = latest?.eventKey ?? getFirstKnownEventKey();
+  const stars = latest?.stars ?? getAverageSearchStars(teamNumber) ?? 0;
+  const record = latest?.record ?? "--";
+  const eventLabel = latest?.eventName ?? "No loaded competition";
+  const searchText = [
+    teamNumber,
+    name,
+    record,
+    seasonRecord,
+    eventLabel,
+    ...notes.flatMap((note) => [note.notes, note.gameLabel, note.addedDate]),
+  ].join(" ").toLowerCase();
+
+  return {
+    teamNumber,
+    name,
+    record,
+    seasonRecord,
+    eventKey: eventKeyForCard,
+    eventLabel,
+    stars,
+    score: stars + notes.length * 0.25 + (latest ? 1 : 0),
+    notes,
+    searchText,
+    numberStartsWithQuery: String(teamNumber).startsWith(query),
+    nameIncludesQuery: name.toLowerCase().includes(query),
+  };
+}
+
+function getTeamSeasonRecord(teamNumber) {
+  const totals = { wins: 0, losses: 0, ties: 0, played: 0 };
+
+  state.teamEventStats.forEach((record) => {
+    if (record.teamNumber !== teamNumber) return;
+    totals.wins += record.wins || 0;
+    totals.losses += record.losses || 0;
+    totals.ties += record.ties || 0;
+    totals.played += record.played || 0;
+  });
+
+  return totals.played ? `${totals.wins}-${totals.losses}-${totals.ties}` : "--";
+}
+
+function getAverageSearchStars(teamNumber) {
+  const stars = [];
+
+  state.teamEventStats.forEach((record) => {
+    if (record.teamNumber === teamNumber && Number.isFinite(record.stars)) stars.push(record.stars);
+  });
+
+  if (!stars.length) return null;
+  return Math.round(stars.reduce((sum, value) => sum + value, 0) / stars.length);
+}
+
+function getTeamNumberFromAutoRecord(teamRecord) {
+  const labelNumber = String(teamRecord?.label || "").match(/\d{2,6}/)?.[0];
+  return labelNumber ? Number(labelNumber) : null;
+}
+
+function getAutoStorageLabelForTeam(teamNumber) {
+  return Object.values(getAutoStorage()).find((teamRecord) =>
+    getTeamNumberFromAutoRecord(teamRecord) === teamNumber
+  )?.label;
+}
+
+function getFirstKnownEventKey() {
+  return state.participation.length ? eventKey(state.participation[0]) : "";
 }
 
 function getAllianceSimulation() {

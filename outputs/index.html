@@ -10,7 +10,7 @@
     >
     <meta name="theme-color" content="#0b0b0c">
     <link rel="manifest" href="manifest.webmanifest">
-    <link rel="stylesheet" href="styles.css?v=20260912-mobilefield">
+    <link rel="stylesheet" href="styles.css?v=20260912-teamsearch">
   </head>
   <body>
     <button class="mobile-menu-button" id="sidebar-toggle" type="button" aria-label="Open navigation" aria-expanded="false">
@@ -262,6 +262,22 @@
           </article>
         </section>
 
+        <section class="team-search-panel" aria-labelledby="team-search-title">
+          <div class="team-search-panel__header">
+            <div>
+              <p class="section-kicker">Team Search</p>
+              <h2 id="team-search-title">Search teams</h2>
+            </div>
+            <label class="team-search-box">
+              <span>Team number, name, or notes</span>
+              <input id="team-search-input" type="search" inputmode="search" autocomplete="off" placeholder="Search 7305, GearCats, notes...">
+            </label>
+          </div>
+          <div class="team-search-results" id="team-search-results">
+            <div class="empty">Type a team number, team name, or scouting note to search.</div>
+          </div>
+        </section>
+
         <section class="upcoming-panel" aria-labelledby="upcoming-title">
           <div>
             <p class="section-kicker">Upcoming Match</p>
@@ -321,7 +337,7 @@
       </section>
     </main>
 
-    <script src="cloud-config.js?v=20260912-mobilefield"></script>
-    <script src="app.js?v=20260912-mobilefield"></script>
+    <script src="cloud-config.js?v=20260912-teamsearch"></script>
+    <script src="app.js?v=20260912-teamsearch"></script>
   </body>
 </html>
